@@ -1,9 +1,11 @@
-from data_wrangling import combine_info_utils, specific_utils
 import os
-import pandas as pd
 from pathlib import Path
-from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import cmp_decode
-from data_wrangling import further_processing_class
+
+import pandas as pd
+from data_wrangling import (combine_info_utils, further_processing_class,
+                            specific_utils)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import \
+    cmp_decode
 
 
 def load_all_retry_decoder_results(

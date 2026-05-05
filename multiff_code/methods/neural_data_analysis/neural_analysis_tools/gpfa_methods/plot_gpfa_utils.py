@@ -1,16 +1,11 @@
 import random
-import numpy as np
-import matplotlib.pyplot as plt
 
-
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
 from matplotlib import cm
 from matplotlib.colors import Normalize
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
-import numpy as np
-import plotly.graph_objects as go
 
 
 def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.5,

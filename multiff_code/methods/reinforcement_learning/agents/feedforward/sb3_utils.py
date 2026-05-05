@@ -1,13 +1,14 @@
+import json
 import os
+import time
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import json
-import time
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
-from stable_baselines3.common.results_plotter import load_results, ts2xy
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import (
+    BaseCallback, EvalCallback, StopTrainingOnNoModelImprovement)
 from stable_baselines3.common.monitor import LoadMonitorResultsError
+from stable_baselines3.common.results_plotter import load_results, ts2xy
 
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False

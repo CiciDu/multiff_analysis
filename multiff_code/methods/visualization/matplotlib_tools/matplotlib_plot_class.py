@@ -1,6 +1,7 @@
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
-from visualization import base_plot_class
 import matplotlib.pyplot as plt
+from planning_analysis.show_planning.cur_vs_nxt_ff import (
+    find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class)
+from visualization import base_plot_class
 
 
 class MatplotlibPlotter(base_plot_class.BasePlotter):

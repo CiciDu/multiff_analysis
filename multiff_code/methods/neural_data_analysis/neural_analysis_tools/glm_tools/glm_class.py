@@ -3,12 +3,10 @@ import math
 
 import numpy as np
 import pandas as pd
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
     plot_modeling_result
-)
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
     pn_feature_selection
-)
 from sklearn.preprocessing import StandardScaler
 
 

@@ -3,16 +3,18 @@
 # ============================================================
 
 import warnings
-from matplotlib.ticker import PercentFormatter
-from matplotlib.lines import Line2D
-from planning_analysis.factors_vs_indicators import process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
+
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.colors as mcolors
-
-from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mpl import LINESTYLE_MAP
+from matplotlib.lines import Line2D
+from matplotlib.ticker import PercentFormatter
+from planning_analysis.factors_vs_indicators import process_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import \
+    plot_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mpl import \
+    LINESTYLE_MAP
 
 
 def _get_mpl_ax(fig, row_number=None, col_number=None):

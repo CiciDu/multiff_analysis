@@ -1,7 +1,9 @@
-from reinforcement_learning.base_classes import base_env
 import os
+
 import numpy as np
 import pandas as pd
+from reinforcement_learning.base_classes import base_env
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

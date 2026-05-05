@@ -5,13 +5,11 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import \
+    _build_folds
 from scipy import sparse
 from scipy.optimize import minimize
 from scipy.special import gammaln
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
-    _build_folds,
-)
 
 
 @dataclass
@@ -365,37 +363,65 @@ def cross_validated_ll(
     random_state=0,
     cv_mode='blocked_time_buffered',
     buffer_samples=20,
+    folds=None,
+    warm_start_coefs=None,
+    return_coefs=False,
 ):
     """
     Returns:
         ll_per_fold : (n_folds,) array of model NLL (nats/spike), lower = better
-    """
-    folds = _build_folds(
-        len(y),
-        n_splits=n_folds,
-        cv_splitter=cv_mode,
-        random_state=random_state,
-        buffer_samples=buffer_samples,
-    )
-    ll_folds = []
+        If return_coefs=True, returns (ll_per_fold, coef_per_fold) where
+        coef_per_fold is a list of pd.Series, one per fold.
 
-    for train_idx, test_idx in folds:
+    Parameters
+    ----------
+    folds : list of (train_idx, test_idx), optional
+        Pre-built fold splits. When provided, n_folds/random_state/cv_mode/
+        buffer_samples are ignored for fold construction (they are not used).
+    warm_start_coefs : list of pd.Series, optional
+        Per-fold warm-start coefficients (e.g. from the previous full model).
+        Each Series must be indexed by design_df.columns.
+    return_coefs : bool
+        If True, also return the per-fold fitted coefficients.
+    """
+    if folds is None:
+        folds = _build_folds(
+            len(y),
+            n_splits=n_folds,
+            cv_splitter=cv_mode,
+            random_state=random_state,
+            buffer_samples=buffer_samples,
+        )
+    ll_folds = []
+    coef_folds = [] if return_coefs else None
+
+    for k, (train_idx, test_idx) in enumerate(folds):
         X_train = design_df.iloc[train_idx]
         y_train = y[train_idx]
         X_test = design_df.iloc[test_idx]
         y_test = y[test_idx]
+
+        beta0_k = None
+        if warm_start_coefs is not None:
+            beta0_k = warm_start_coefs[k].reindex(X_train.columns).fillna(0).to_numpy()
 
         fit = fit_poisson_gam(
             design_df=X_train,
             y=y_train,
             groups=groups,
             verbose=False,
+            beta0=beta0_k,
         )
 
         ll_test, _, _ = compute_likelihoods(X_test, fit.coef, y_test)
         ll_folds.append(ll_test)
+        if return_coefs:
+            coef_folds.append(fit.coef)
 
-    return np.array(ll_folds)
+    ll_arr = np.array(ll_folds)
+    if return_coefs:
+        return ll_arr, coef_folds
+    return ll_arr
 
 
 def cross_validated_ll_and_null(
@@ -406,6 +432,8 @@ def cross_validated_ll_and_null(
     random_state=0,
     cv_mode='blocked_time_buffered',
     buffer_samples=20,
+    folds=None,
+    return_coefs=False,
 ):
     """
     Like cross_validated_ll, but also returns the mean-rate (null) NLL per fold.
@@ -417,16 +445,27 @@ def cross_validated_ll_and_null(
     -------
     ll_model_per_fold : (n_folds,) array — model NLL (nats/spike), lower = better
     ll_null_per_fold  : (n_folds,) array — mean-rate NLL (nats/spike), lower = better
+    coef_per_fold     : list of pd.Series — only returned when return_coefs=True
+
+    Parameters
+    ----------
+    folds : list of (train_idx, test_idx), optional
+        Pre-built fold splits. When provided, n_folds/random_state/cv_mode/
+        buffer_samples are ignored for fold construction.
+    return_coefs : bool
+        If True, return a third element: list of per-fold fitted pd.Series.
     """
-    folds = _build_folds(
-        len(y),
-        n_splits=n_folds,
-        cv_splitter=cv_mode,
-        random_state=random_state,
-        buffer_samples=buffer_samples,
-    )
+    if folds is None:
+        folds = _build_folds(
+            len(y),
+            n_splits=n_folds,
+            cv_splitter=cv_mode,
+            random_state=random_state,
+            buffer_samples=buffer_samples,
+        )
     ll_model_folds = []
     ll_null_folds = []
+    coef_folds = [] if return_coefs else None
 
     for train_idx, test_idx in folds:
         X_train = design_df.iloc[train_idx]
@@ -444,8 +483,14 @@ def cross_validated_ll_and_null(
         ll_model, ll_mean, _ = compute_likelihoods(X_test, fit.coef, y_test)
         ll_model_folds.append(ll_model)
         ll_null_folds.append(ll_mean)
+        if return_coefs:
+            coef_folds.append(fit.coef)
 
-    return np.array(ll_model_folds), np.array(ll_null_folds)
+    ll_model_arr = np.array(ll_model_folds)
+    ll_null_arr = np.array(ll_null_folds)
+    if return_coefs:
+        return ll_model_arr, ll_null_arr, coef_folds
+    return ll_model_arr, ll_null_arr
 
 
 def _format_lambda(lam):
@@ -731,6 +776,7 @@ def fit_poisson_gam(
     save_design: bool = False,
     save_metadata: Optional[Dict] = None,
     load_if_exists: bool = True,
+    beta0: Optional[np.ndarray] = None,
 ) -> FitResult:
     # ------------------------------------------------------------------
     # 1) Load cached result if requested
@@ -776,7 +822,8 @@ def fit_poisson_gam(
     # ------------------------------------------------------------------
     # 4) Initialization and callback
     # ------------------------------------------------------------------
-    beta0 = _init_beta(y=y, p=p, col_index=col_index)
+    if beta0 is None:
+        beta0 = _init_beta(y=y, p=p, col_index=col_index)
 
     callback = _make_callback(fun, jac, beta0) if verbose else None
 

@@ -1,7 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
+import numpy as np
 import numpy.linalg as LA
+from matplotlib.patches import Ellipse
 
 
 class PeriEventTrajectoryMixin:

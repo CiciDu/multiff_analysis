@@ -1,31 +1,26 @@
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import StratifiedKFold
-from typing import Any, Dict, Optional
-from tqdm import tqdm  # make sure to install with: pip install tqdm
+import itertools
+from typing import Any, Dict, Optional, Sequence, Tuple
+
 import matplotlib.pyplot as plt
-from statsmodels.stats.multitest import multipletests
-from sklearn.utils import shuffle
-from scipy import stats
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.svm import SVC, LinearSVC
-from typing import Optional, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
-from typing import Sequence, Tuple, Optional, Dict, Any
-
-from sklearn.model_selection import StratifiedKFold, GridSearchCV, RandomizedSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import roc_auc_score, make_scorer
-from sklearn.pipeline import Pipeline
+from scipy import stats
+from sklearn.base import clone
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-
 # classifiers
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import make_scorer, roc_auc_score
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     StratifiedKFold)
 from sklearn.neural_network import MLPClassifier
-from sklearn.base import clone
-import itertools
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC, LinearSVC
+from sklearn.utils import shuffle
+from statsmodels.stats.multitest import multipletests
+from tqdm import tqdm  # make sure to install with: pip install tqdm
 
 
 # ---------------------------------------------------------------------

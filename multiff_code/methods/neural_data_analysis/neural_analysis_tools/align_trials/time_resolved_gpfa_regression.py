@@ -1,21 +1,20 @@
 # gpfa new
 
-import os
-import numpy as np
-import pandas as pd
 import logging
+import os
 from typing import Optional
 
-from sklearn.metrics import r2_score
-from sklearn.linear_model import RidgeCV
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
-from joblib import Parallel, delayed
-
+import numpy as np
+import pandas as pd
 from elephant.gpfa import GPFA
-
-from neural_data_analysis.neural_analysis_tools.gpfa_methods import fit_gpfa_utils
+from joblib import Parallel, delayed
+from neural_data_analysis.neural_analysis_tools.gpfa_methods import \
+    fit_gpfa_utils
+from sklearn.linear_model import RidgeCV
+from sklearn.metrics import r2_score
+from sklearn.model_selection import KFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
 logging.basicConfig(level=logging.INFO)

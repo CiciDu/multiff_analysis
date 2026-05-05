@@ -1,25 +1,24 @@
-from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_calib_utils
-from pattern_discovery import make_ff_dataframe
-from null_behaviors import curv_of_traj_utils
-from planning_analysis.test_params_for_planning import params_utils
-from planning_analysis.show_planning import nxt_ff_utils
-from pattern_discovery import cluster_analysis
-from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
-
-
-import os
 import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 from os.path import exists
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import (process_monkey_information, retrieve_raw_data,
+                            specific_utils, time_calib_utils)
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
+from matplotlib import rc
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import \
+    prep_target_data
+from null_behaviors import curv_of_traj_utils
+from pattern_discovery import (cluster_analysis, make_ff_dataframe,
+                               monkey_landing_in_ff,
+                               organize_patterns_and_features,
+                               pattern_by_trials)
+from planning_analysis.show_planning import nxt_ff_utils
+from planning_analysis.test_params_for_planning import params_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from data_wrangling import combine_info_utils
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    multiff_encoding_params
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
-    encoding_models,
-    encoding_runner,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import plot_gam_fit
-import os
+    encoding_models, encoding_runner)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    plot_gam_fit
 
 _DEFAULT_CV_MODE = "blocked_time_buffered"
 

@@ -2,12 +2,13 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from neural_data_analysis.design_kits.design_around_event.event_binning import (
-    bin_spikes_by_cluster,
-)
+from neural_data_analysis.design_kits.design_around_event.event_binning import \
+    bin_spikes_by_cluster
 from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    process_encode_design
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import process_encode_design 
+
 # ============================================================
 # Padding utilities
 # ============================================================

@@ -1,13 +1,13 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import itertools
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from planning_analysis.factors_vs_indicators import process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mpl import LINESTYLE_MAP
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils_mpl
-
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_utils, plot_variations_utils_mpl)
+from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mpl import \
+    LINESTYLE_MAP
 
 
 def plot_pairwise_interactions(
@@ -35,8 +35,9 @@ def plot_pairwise_interactions(
     """
 
     import itertools
-    import numpy as np
+
     import matplotlib.pyplot as plt
+    import numpy as np
 
     valid_keys = [k for k in sweep_keys if k in df.columns]
 
@@ -220,9 +221,10 @@ def build_conditioned_subset(
     return subset, fixed_values
 
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 
 def add_seed_column(df):
     """
@@ -535,9 +537,9 @@ def streamline_plot_agents_with_conditions(
 
     return fig
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 def plot_conditional(

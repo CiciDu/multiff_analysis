@@ -1,9 +1,11 @@
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
-from os.path import exists
 import json
+import os
+from os.path import exists
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000

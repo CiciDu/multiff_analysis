@@ -1,16 +1,12 @@
 
-from data_wrangling import specific_utils
-from planning_analysis.plan_factors import build_factor_comp
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-
-
-import seaborn as sns
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import mannwhitneyu
-
 import numpy as np
+import pandas as pd
+import seaborn as sns
+from data_wrangling import specific_utils
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            monkey_plan_factors_x_sess_class)
+from scipy.stats import mannwhitneyu
 
 
 def run_tests_over_monkeys(

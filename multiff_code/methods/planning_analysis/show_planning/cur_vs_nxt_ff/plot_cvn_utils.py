@@ -1,15 +1,16 @@
 
-import plotly.express as px
-import seaborn as sns
-from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
-from null_behaviors import show_null_trajectory
-from pattern_discovery import ff_dataframe_utils
-
 import os
-import numpy as np
+
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
+import plotly.express as px
+import seaborn as sns
 from matplotlib import cm
+from null_behaviors import show_null_trajectory
+from pattern_discovery import ff_dataframe_utils
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

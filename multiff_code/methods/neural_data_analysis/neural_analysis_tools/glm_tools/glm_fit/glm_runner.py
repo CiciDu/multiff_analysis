@@ -1,15 +1,16 @@
-import os
-import json
-import numpy as np
 import importlib
-import matplotlib.pyplot as plt
+import json
+import os
 from typing import Dict
 
+import matplotlib.pyplot as plt
+import numpy as np
 from neural_data_analysis.design_kits.design_around_event import design_checks
 from neural_data_analysis.design_kits.design_by_segment import spike_history
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import glm_fit_utils
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import general_glm_fit
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import compare_glm_fit
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import (
+    general_glm_fit, glm_fit_utils)
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import \
+    compare_glm_fit
 
 
 class GLMPipeline:
@@ -306,6 +307,7 @@ class GLMPipeline:
             )
             
 from pathlib import Path
+
 
 def extract_and_remove_data_part(path):
     path = Path(path)

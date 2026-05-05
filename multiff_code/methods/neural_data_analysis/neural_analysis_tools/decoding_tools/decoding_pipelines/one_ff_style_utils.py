@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Iterable, Sequence
 
 import numpy as np
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
+    cv_decoding
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    population_analysis_utils
 from sklearn.cross_decomposition import CCA
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import population_analysis_utils
 
 
 def gaussian_kernel(width: int) -> np.ndarray:

@@ -50,10 +50,11 @@ def turn_spike_segs_df_into_spiketrains(
     - spiketrains (list of list of neo.SpikeTrain): Outer list over segments, inner list over clusters.
     - processed_segments (np.ndarray): List of segment IDs corresponding to spiketrains.
     """
-    import numpy as np
-    import neo
-    import quantities as pq
     import warnings
+
+    import neo
+    import numpy as np
+    import quantities as pq
 
     spiketrains = []
     processed_segments = []

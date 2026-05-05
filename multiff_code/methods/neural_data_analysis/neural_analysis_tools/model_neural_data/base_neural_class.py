@@ -1,12 +1,17 @@
-from data_wrangling import further_processing_class
-from neural_data_analysis.neural_analysis_tools.model_neural_data import drop_high_corr_vars, drop_high_vif_vars
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.topic_based_neural_analysis.target_decoder import prep_target_decoder
 import os
+from os.path import exists
+
 import numpy as np
 import pandas as pd
-from os.path import exists
+from data_wrangling import further_processing_class
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.neural_analysis_tools.model_neural_data import (
+    drop_high_corr_vars, drop_high_vif_vars)
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
+    prep_monkey_data, prep_target_data)
+from neural_data_analysis.topic_based_neural_analysis.target_decoder import \
+    prep_target_decoder
 
 
 class NeuralBaseClass(further_processing_class.FurtherProcessing):

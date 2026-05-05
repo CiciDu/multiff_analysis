@@ -1,10 +1,9 @@
-from machine_learning.ml_methods import prep_ml_data_utils
-from planning_analysis.show_planning import show_planning_utils
 import pandas as pd
 import statsmodels.api as sm
+from machine_learning.ml_methods import prep_ml_data_utils
+from planning_analysis.show_planning import show_planning_utils
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
 
 def add_interaction_terms_to_df(df, specific_columns=None):

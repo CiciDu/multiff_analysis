@@ -1,14 +1,15 @@
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_behaviors_utils
-from null_behaviors import show_null_trajectory
-from eye_position_analysis import eye_positions
-
 import os
-import seaborn as sns
-import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+import numpy as np
+import seaborn as sns
+from data_wrangling import specific_utils
+from eye_position_analysis import eye_positions
 from matplotlib.lines import Line2D
+from null_behaviors import show_null_trajectory
+from visualization.matplotlib_tools import plot_behaviors_utils
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

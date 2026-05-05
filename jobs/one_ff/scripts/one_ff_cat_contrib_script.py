@@ -8,7 +8,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------
 # Locate project root
 # ---------------------------------------------------------------------
@@ -21,9 +20,8 @@ else:
     raise RuntimeError("Could not find Multifirefly-Project root")
 
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_pipeline,
-)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    one_ff_gam_pipeline
 
 # ---------------------------------------------------------------------
 # Global config

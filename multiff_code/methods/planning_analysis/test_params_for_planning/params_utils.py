@@ -1,13 +1,14 @@
 
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from dash import html, dcc
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
 import itertools
-import plotly.graph_objects as go
+
 import matplotlib.colors as mplc
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from dash import dcc, html
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from scipy import stats
 
 
 def add_values_and_marks_to_ref_point_info(ref_point_info):

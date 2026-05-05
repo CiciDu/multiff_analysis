@@ -1,13 +1,15 @@
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib import rc
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
+    plot_neural_data
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

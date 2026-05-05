@@ -1,13 +1,13 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import neural_data_modeling
-
+import math
 import os
-import numpy as np
+
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import math
 from matplotlib import rc
-
+from neural_data_analysis.neural_analysis_tools.model_neural_data import \
+    neural_data_modeling
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

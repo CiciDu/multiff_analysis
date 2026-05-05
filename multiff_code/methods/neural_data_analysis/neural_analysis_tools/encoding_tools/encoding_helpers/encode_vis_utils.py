@@ -1,10 +1,8 @@
 from typing import Dict, Tuple
 
 import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoding_design_utils,
-)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
 
 
 def add_ff_visibility_temporal_designs(

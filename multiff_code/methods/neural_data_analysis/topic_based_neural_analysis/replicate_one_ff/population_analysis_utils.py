@@ -16,12 +16,10 @@ Author: you
 
 import numpy as np
 
-
 # =========================
 # Spike binning
 # =========================
 
-import numpy as np
 
 
 def bin_spikes(spike_times, ts):

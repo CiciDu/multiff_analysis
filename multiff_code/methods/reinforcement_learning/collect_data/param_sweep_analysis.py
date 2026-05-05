@@ -1,18 +1,17 @@
+import contextlib
 import io
 import os
 import sys
-import contextlib
+
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
-
-from reinforcement_learning.agents.feedforward import sb3_env
+import seaborn as sns
+from planning_analysis.agent_analysis import (
+    agent_plan_factors_x_agents_class, compare_monkey_and_agent_utils)
+from reinforcement_learning.agents.feedforward import sb3_class, sb3_env
 from reinforcement_learning.base_classes import rl_base_utils
-from reinforcement_learning.agents.feedforward import sb3_class
-
-from planning_analysis.agent_analysis import agent_plan_factors_x_agents_class
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
 from reinforcement_learning.collect_data import agent_patterns_class
+
 
 def _get_sweep_results_save_path(overall_folder_name, save_filename='sweep_results.pkl'):
     '''
@@ -220,6 +219,7 @@ def collect_plan_results_df(
     agent_perc_df : pd.DataFrame
     '''
     import os
+
     import pandas as pd
 
     if max_n_agents is not None:

@@ -1,14 +1,17 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import neural_data_modeling
-from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.topic_based_neural_analysis.target_decoder import prep_target_decoder
-
-from statsmodels.multivariate.cancorr import CanCorr
-
 import numpy as np
 import pandas as pd
+from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import \
+    cca_plotting
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.neural_analysis_tools.model_neural_data import \
+    neural_data_modeling
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
+    prep_monkey_data, prep_target_data)
+from neural_data_analysis.topic_based_neural_analysis.target_decoder import \
+    prep_target_decoder
 from sklearn.preprocessing import StandardScaler
+from statsmodels.multivariate.cancorr import CanCorr
 
 
 class CCAclass():

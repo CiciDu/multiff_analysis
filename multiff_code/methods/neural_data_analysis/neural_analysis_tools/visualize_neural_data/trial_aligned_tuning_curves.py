@@ -1,9 +1,10 @@
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_plot
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
+    raster_plot
 
 
 def prepare_trial_aligned_tuning_curves_data(aligned_spike_trains):

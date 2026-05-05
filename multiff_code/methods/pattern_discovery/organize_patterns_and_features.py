@@ -1,14 +1,14 @@
 # --- tidy imports (remove duplicate) ---
-from data_wrangling import specific_utils, general_utils
-from pattern_discovery import pattern_by_trials, cluster_analysis
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
-from planning_analysis.show_planning import nxt_ff_utils
-
 import os
+from datetime import datetime
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from datetime import datetime
-import matplotlib.pyplot as plt
+from data_wrangling import general_utils, specific_utils
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
+from pattern_discovery import cluster_analysis, pattern_by_trials
+from planning_analysis.show_planning import nxt_ff_utils
 
 # Consider moving these to your script/entrypoint, not a module:
 # os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

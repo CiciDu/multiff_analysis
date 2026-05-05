@@ -8,11 +8,10 @@ This preserves backward compatibility for any code that still uses
 while internally routing all work to the unified function-based API.
 """
 
-import numpy as np
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
-    plot_variations_functions as pvf
-)
 import matplotlib.pyplot as plt
+import numpy as np
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import \
+    plot_variations_functions as pvf
 
 
 class _PlotVariations:

@@ -1,14 +1,14 @@
-from data_wrangling import time_calib_utils
-import os
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
 import math
-from matplotlib import rc
-import scipy.interpolate as interpolate
+import os
 import subprocess
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.interpolate as interpolate
+from data_wrangling import time_calib_utils
+from matplotlib import rc
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -114,6 +114,7 @@ def _make_all_binned_spikes(spikes_df, min_time=None, max_time=None, bin_width=0
 
 
 import numpy as np
+
 
 def prepare_binned_spikes_df(spikes_df, spike_time_col='time', bin_width=0.02, min_time=None, max_time=None):
     """

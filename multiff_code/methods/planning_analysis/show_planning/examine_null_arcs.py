@@ -1,14 +1,12 @@
-from null_behaviors import show_null_trajectory
-from data_wrangling import general_utils
-
 import os
-import numpy as np
+
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from data_wrangling import general_utils
 from matplotlib import rc
-import os
+from null_behaviors import show_null_trajectory
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

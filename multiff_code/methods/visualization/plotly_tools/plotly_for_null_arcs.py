@@ -1,17 +1,17 @@
 
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_behaviors_utils
-from null_behaviors import show_null_trajectory, curvature_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-
 import os
-import numpy as np
+from math import pi
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from math import pi
+from data_wrangling import specific_utils
+from matplotlib import rc
+from null_behaviors import curvature_utils, show_null_trajectory
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from visualization.matplotlib_tools import plot_behaviors_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

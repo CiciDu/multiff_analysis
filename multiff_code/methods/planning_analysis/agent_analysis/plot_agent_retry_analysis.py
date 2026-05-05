@@ -1,8 +1,6 @@
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 from pattern_discovery.learning.proportion_trend import plot_stacked_bars_utils
-
 
 
 def plot_retry_outcome_sweep_ci(df, config, sweep_key):
@@ -106,9 +104,10 @@ def plot_retry_outcome_sweep_ci(df, config, sweep_key):
 
     return fig, axes
 import math
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 def _prepare_retry_strategy_plot_df(df, config, sweep_key):

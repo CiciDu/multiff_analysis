@@ -1,13 +1,15 @@
 import pandas as pd
-
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 from neural_data_analysis.design_kits.design_around_event import stop_design
-
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
-
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import \
+    decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.topic_based_neural_analysis.ff_visibility import \
+    decode_vis_utils
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_utils
 
 
 def build_fs_design_decoding(

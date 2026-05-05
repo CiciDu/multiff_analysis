@@ -23,10 +23,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import glm_fit_utils
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import (
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import \
+    glm_fit_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import \
     plot_glm_fit
-)
 from scipy import stats as _stats
 from sklearn.model_selection import GroupKFold, KFold
 from statsmodels.tools.sm_exceptions import ConvergenceWarning

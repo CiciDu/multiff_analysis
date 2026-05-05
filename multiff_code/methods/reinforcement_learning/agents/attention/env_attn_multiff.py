@@ -15,8 +15,9 @@ Typical usage:
     from env_attn_multiff import EnvForAttentionSAC, get_action_limits, batch_obs_to_attn_tensors
 """
 
-from typing import List, Tuple, Dict, Optional
 import math
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import torch
 from reinforcement_learning.base_classes import base_env, more_envs

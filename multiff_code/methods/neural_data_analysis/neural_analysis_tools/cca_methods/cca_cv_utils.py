@@ -1,9 +1,8 @@
-from sklearn.model_selection import KFold, GroupKFold
 import numpy as np
 import pandas as pd
-from cca_zoo.linear import rCCA, CCA
+from cca_zoo.linear import CCA, rCCA
+from sklearn.model_selection import GroupKFold, KFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold
 
 
 def combine_cca_cv_results(cca_no_lag, cca_lags, n_components=7, reg=0.1, n_splits=10,

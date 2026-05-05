@@ -1,6 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 
 def run_variance_explained_analysis(
     report,
@@ -404,6 +405,7 @@ def single_neuron_temporal_VE(X, X_hat, *, aggregate='mean'):
 
 import numpy as np
 import pandas as pd
+
 
 def _fro_sq(A):
     """

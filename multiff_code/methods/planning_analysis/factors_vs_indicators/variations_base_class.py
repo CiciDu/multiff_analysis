@@ -1,16 +1,21 @@
 
-from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
-from planning_analysis.factors_vs_indicators import make_variations_utils, predict_y_values_class, compare_y_values_class
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 from os.path import exists
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib import rc
+from planning_analysis.factors_vs_indicators import (compare_y_values_class,
+                                                     make_variations_utils,
+                                                     predict_y_values_class)
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_class, plot_variations_utils)
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            plan_factors_utils,
+                                            test_vs_control_utils)
+from planning_analysis.show_planning import show_planning_class
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

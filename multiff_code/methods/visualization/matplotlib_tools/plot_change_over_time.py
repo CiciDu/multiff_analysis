@@ -1,8 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
-from scipy import stats
 from matplotlib.ticker import FixedLocator
+from scipy import stats
 
 
 def plot_regression(ax, x, y, data, hue=None, scatter_kws=None, line_kws=None):

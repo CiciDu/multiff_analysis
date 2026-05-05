@@ -1,5 +1,6 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def _extract_cv(cv):
     test = np.asarray(cv["test_corrs_by_fold"])  # (F, K)

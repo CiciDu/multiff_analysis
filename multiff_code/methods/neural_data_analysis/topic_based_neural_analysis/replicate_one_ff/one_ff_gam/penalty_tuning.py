@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import numpy as np
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    one_ff_gam_fit
 from sklearn.model_selection import KFold
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import one_ff_gam_fit
 
 
 def _format_lambda(lam):
@@ -622,11 +622,10 @@ def tune_penalties(
 # PGAM Penalty Tuning Analysis (Functional Version)
 # ============================================================
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
 
 # ============================================================
 # 1. Convert cv_results → DataFrame

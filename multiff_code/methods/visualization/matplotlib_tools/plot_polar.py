@@ -1,12 +1,13 @@
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 from data_wrangling import specific_utils
+from matplotlib.lines import Line2D
 from pattern_discovery import make_ff_dataframe
 from visualization.matplotlib_tools import plot_behaviors_utils
 
-import os
-import seaborn as sns
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

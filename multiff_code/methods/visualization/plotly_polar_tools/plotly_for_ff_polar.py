@@ -1,13 +1,13 @@
-from visualization.plotly_polar_tools import plotly_for_trajectory_polar
-
+import math
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
-import math
+from matplotlib import rc
+from visualization.plotly_polar_tools import plotly_for_trajectory_polar
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

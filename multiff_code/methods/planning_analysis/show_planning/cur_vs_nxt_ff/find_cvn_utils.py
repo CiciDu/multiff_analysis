@@ -1,16 +1,17 @@
+import math
+import warnings
+from math import pi
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from data_wrangling import general_utils, specific_utils
 from decision_making_analysis.ff_data_acquisition import ff_data_utils
-from data_wrangling import specific_utils, general_utils
-from planning_analysis.show_planning import nxt_ff_utils
 from null_behaviors import show_null_trajectory
 from pattern_discovery import cluster_analysis
-import pandas as pd
-import numpy as np
-import math
-import matplotlib.pyplot as plt
+from planning_analysis.show_planning import nxt_ff_utils
 from scipy import stats
-import plotly.graph_objects as go
-from math import pi
-import warnings
 
 
 def _add_basic_monkey_info(stops_near_ff_df, monkey_information):

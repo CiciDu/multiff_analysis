@@ -1,21 +1,19 @@
 
+import copy
+import os
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from dash import Dash, Input, Output, State, ctx, html
+from dash.exceptions import PreventUpdate
+from matplotlib import rc
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from visualization.dash_tools import dash_utils
 from visualization.dash_tools.dash_main_class_methods import dash_main_class
 from visualization.plotly_tools import plotly_for_correlation
-from visualization.dash_tools import dash_utils, dash_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-
-import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from dash import Dash, html, Input, State, Output, ctx
-from dash.exceptions import PreventUpdate
-import pandas as pd
-import copy
-import plotly.graph_objects as go
-
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

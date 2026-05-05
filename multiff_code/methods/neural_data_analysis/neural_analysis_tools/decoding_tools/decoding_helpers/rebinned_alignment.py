@@ -1,7 +1,6 @@
 import pandas as pd
 from neural_data_analysis.design_kits.design_by_segment import rebin_segments
 
-
 DEFAULT_ID_COLS = {
     'segment',
     'bin',

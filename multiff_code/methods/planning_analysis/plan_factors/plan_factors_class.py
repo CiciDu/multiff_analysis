@@ -1,11 +1,15 @@
-from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
-from data_wrangling import base_processing_class, general_utils
-from planning_analysis.plan_factors import plan_factors_helper_class
-import pandas as pd
 import os
+
 import numpy as np
+import pandas as pd
+from data_wrangling import base_processing_class, general_utils
+from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            plan_factors_helper_class,
+                                            plan_factors_utils,
+                                            test_vs_control_utils)
+from planning_analysis.show_planning.cur_vs_nxt_ff import (cvn_from_ref_class,
+                                                           find_cvn_utils)
 
 
 class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):

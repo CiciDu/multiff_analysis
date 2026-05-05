@@ -1,8 +1,8 @@
 # ============================================================
 # parent_assembler_mpl.py  — Matplotlib version
 # ============================================================
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.gridspec import GridSpec
 
 # ---------------------------------------------------------------------
@@ -152,10 +152,11 @@ class ParentFigureAssemblerMPL:
         return fig
 
 
-import numpy as np
 import matplotlib.colors as mcolors
+import numpy as np
 from matplotlib.collections import PathCollection, PolyCollection
 from matplotlib.patches import Rectangle
+
 
 def _copy_axes_content(src_ax, dst_ax):
     """

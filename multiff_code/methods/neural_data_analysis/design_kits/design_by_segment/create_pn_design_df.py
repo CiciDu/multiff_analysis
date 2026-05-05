@@ -4,11 +4,9 @@ from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
-from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats,
-    spatial_feats,
-    temporal_feats
-)
+from neural_data_analysis.design_kits.design_by_segment import (other_feats,
+                                                                spatial_feats,
+                                                                temporal_feats)
 
 # your modules
 

@@ -1,17 +1,15 @@
+import copy
+import math
+
+import numpy as np
+import pandas as pd
 from data_wrangling import specific_utils
+from null_behaviors import curv_of_traj_utils, curvature_utils, opt_arc_utils
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            build_factor_comp_utils,
+                                            plan_factors_utils)
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, build_factor_comp_utils, build_factor_comp
-from data_wrangling import specific_utils
-from null_behaviors import curvature_utils, curv_of_traj_utils, opt_arc_utils
-import numpy as np
-import pandas as pd
-import math
-import copy
-from null_behaviors import curv_of_traj_utils
-import numpy as np
-import pandas as pd
-import math
 
 
 # try replacing ff_dataframe_visible with ff_info_at_start_df

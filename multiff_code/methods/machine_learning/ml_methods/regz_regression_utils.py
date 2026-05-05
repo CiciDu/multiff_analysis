@@ -1,27 +1,20 @@
 # Standard library imports
 import os
 
+import matplotlib
+import matplotlib.pyplot as plt
 # Third-party imports
 import numpy as np
 import pandas as pd
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib import rc
-
-# Scientific computing
-from scipy import stats
-
-# Machine learning - sklearn
-from sklearn.metrics import (
-    mean_squared_error, mean_absolute_error, r2_score, explained_variance_score,
-    max_error
-)
-from sklearn.linear_model import (
-    Ridge, Lasso, ElasticNet, RidgeCV, LassoCV
-)
-
 # Statistics
 import statsmodels.api as sm
+from matplotlib import rc
+# Scientific computing
+from scipy import stats
+from sklearn.linear_model import ElasticNet, Lasso, LassoCV, Ridge, RidgeCV
+# Machine learning - sklearn
+from sklearn.metrics import (explained_variance_score, max_error,
+                             mean_absolute_error, mean_squared_error, r2_score)
 
 # Deep learning
 

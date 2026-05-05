@@ -1,14 +1,8 @@
-import numpy as np
-from scipy.integrate import odeint
-import quantities as pq
 import neo
-from elephant.spike_train_generation import inhomogeneous_poisson_process
 import numpy as np
-from scipy.integrate import odeint
 import quantities as pq
-import neo
 from elephant.spike_train_generation import inhomogeneous_poisson_process
-
+from scipy.integrate import odeint
 
 
 def integrated_oscillator(dt, num_steps, x0=0, y0=1, angular_frequency=2*np.pi*1e-3):

@@ -1,10 +1,10 @@
 """Shared logic for encoding scripts (encode_pn, encode_vis, encode_stops)."""
 
 import argparse
-from typing import Any, Dict, Type, TypeVar
 import os
 import sys
 from pathlib import Path
+from typing import Any, Dict, Type, TypeVar
 
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == "Multifirefly-Project":
@@ -12,11 +12,10 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         sys.path.insert(0, str(p / "multiff_analysis/multiff_code/methods"))
         break
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
-    encoding_models,
-    encoding_runner,
-)
+    encoding_models, encoding_runner)
 
 RunnerT = TypeVar("RunnerT")
 

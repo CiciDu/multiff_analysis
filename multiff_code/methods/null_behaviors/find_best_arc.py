@@ -1,11 +1,12 @@
-from scipy.stats import rankdata
 import math
+import os
+from math import pi
+
+import numpy as np
 import pandas as pd
 from data_wrangling import specific_utils
+from scipy.stats import rankdata
 
-import os
-import numpy as np
-from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

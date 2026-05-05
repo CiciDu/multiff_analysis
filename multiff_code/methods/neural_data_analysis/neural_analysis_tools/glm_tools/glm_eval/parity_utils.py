@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,6 @@ from sklearn.cross_decomposition import CCA
 from sklearn.model_selection import GroupKFold
 from tqdm import tqdm
 
-from typing import Optional
 
 # ============================================================
 # --------------------- basic helpers ------------------------

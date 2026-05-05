@@ -1,7 +1,9 @@
-import numpy as np
 from math import pi
+
+import numpy as np
 from data_wrangling import specific_utils
 from null_behaviors import show_null_trajectory
+
 
 def _run_single_trial(num_alive_ff=200, arena_radius=1000.0):
     # --- generate fireflies (vectorized) ---

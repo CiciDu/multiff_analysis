@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import argparse
-import time
 import os
+import time
 
 import numpy as np
-
-from neural_data_analysis.neural_analysis_tools.neural_axes.multivariate_axes import cebra_analyzer
-from neural_data_analysis.loaders import load_processed_neural_data  # adjust if needed
+from neural_data_analysis.loaders import \
+    load_processed_neural_data  # adjust if needed
+from neural_data_analysis.neural_analysis_tools.neural_axes.multivariate_axes import \
+    cebra_analyzer
 
 
 def main():

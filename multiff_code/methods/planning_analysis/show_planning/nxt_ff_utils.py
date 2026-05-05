@@ -1,10 +1,8 @@
 
-from data_wrangling import general_utils
-from pattern_discovery import cluster_analysis
-from pattern_discovery import monkey_landing_in_ff
-
-import pandas as pd
 import numpy as np
+import pandas as pd
+from data_wrangling import general_utils
+from pattern_discovery import cluster_analysis, monkey_landing_in_ff
 
 
 def get_all_nxt_ff_df_from_ff_dataframe(

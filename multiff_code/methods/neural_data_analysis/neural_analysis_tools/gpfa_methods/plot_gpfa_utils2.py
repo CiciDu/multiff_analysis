@@ -1,8 +1,10 @@
-import numpy as np
+import random
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import Normalize
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
-import random
+
 
 # ---------- helpers ----------
 def _set_equal_aspect_3d(ax, X, Y, Z):

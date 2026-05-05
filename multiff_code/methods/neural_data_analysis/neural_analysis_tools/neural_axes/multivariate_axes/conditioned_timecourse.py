@@ -1,14 +1,9 @@
 # multivariate_axis_analyzer.py
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
-
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 class ConditionedTimecourseMixin:

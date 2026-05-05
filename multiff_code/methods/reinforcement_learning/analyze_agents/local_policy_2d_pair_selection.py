@@ -1,13 +1,9 @@
 from itertools import combinations
 
 import pandas as pd
-
 from reinforcement_learning.analyze_agents import analyze_policy_smoothness
-
 from reinforcement_learning.analyze_agents.local_policy_2d_core import (
-    _choose_anchor_indices,
-    run_local_policy_2d_sweep_for_one_pair,
-)
+    _choose_anchor_indices, run_local_policy_2d_sweep_for_one_pair)
 
 
 def _parse_slot_feature_label(obs_dim_label):

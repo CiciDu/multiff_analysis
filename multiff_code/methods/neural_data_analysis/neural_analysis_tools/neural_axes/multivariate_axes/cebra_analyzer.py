@@ -1,13 +1,8 @@
 import numpy as np
 import pandas as pd
-
 from cebra import CEBRA
-
 from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
-    build_continuous_fr,
-    events_to_bins,
-    extract_event_windows,
-)
+    build_continuous_fr, events_to_bins, extract_event_windows)
 
 
 class CEBRAAnalyzer:

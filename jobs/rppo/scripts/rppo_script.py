@@ -1,8 +1,10 @@
-import torch
 import argparse
-import sys
 import os
+import sys
 from pathlib import Path
+
+import torch
+
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == 'Multifirefly-Project':
         os.chdir(p)

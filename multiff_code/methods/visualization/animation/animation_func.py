@@ -1,11 +1,11 @@
 
-from visualization.matplotlib_tools import plot_behaviors_utils
-from visualization.animation import animation_utils
-
-
 import os
-import numpy as np
 from math import pi
+
+import numpy as np
+from visualization.animation import animation_utils
+from visualization.matplotlib_tools import plot_behaviors_utils
+
 retrieve_buffer = False
 n_steps = 1000
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

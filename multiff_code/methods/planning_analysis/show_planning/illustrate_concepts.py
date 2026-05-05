@@ -3,7 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from null_behaviors import show_null_trajectory
 from planning_analysis.plan_indicators import diff_in_curv_utils
-from visualization.plotly_tools import plotly_for_null_arcs, plotly_for_monkey
+from visualization.plotly_tools import plotly_for_monkey, plotly_for_null_arcs
 
 
 def plot_with_additional_elements(snf,

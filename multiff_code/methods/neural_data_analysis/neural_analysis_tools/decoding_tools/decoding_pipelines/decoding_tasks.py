@@ -20,39 +20,25 @@ from typing import List
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-
 from neural_data_analysis.design_kits.design_around_event import event_binning
 from neural_data_analysis.design_kits.design_by_segment import (
-    spike_history,
-    temporal_feats,
-    create_pn_design_df,
-)
+    create_pn_design_df, spike_history, temporal_feats)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-    decoding_design_utils,
-    decode_pn_utils,
-    decode_fs_utils,
-    rebinned_alignment,
-    detrend_neural_data,
-)
+    decode_fs_utils, decode_pn_utils, decoding_design_utils,
+    detrend_neural_data, rebinned_alignment)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
-    VIS_DECODING_VAR_CATEGORIES,
-    STOP_DECODING_VAR_CATEGORIES,
-    PN_DECODING_VAR_CATEGORIES,
-    FS_DECODING_VAR_CATEGORIES,
-)
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    collect_stop_data,
-    decode_stops_design,
-)
+    FS_DECODING_VAR_CATEGORIES, PN_DECODING_VAR_CATEGORIES,
+    STOP_DECODING_VAR_CATEGORIES, VIS_DECODING_VAR_CATEGORIES)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import (
-    decode_vis_design,
-    decode_vis_utils,
-)
+    decode_vis_design, decode_vis_utils)
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
+    collect_stop_data, decode_stops_design)
 
 from .base_decoding_task import BaseDecodingTask
-
 
 DEFAULT_STOP_CANONCORR_VARS = [
     "speed", "ang_speed", "accel",

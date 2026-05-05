@@ -1,19 +1,17 @@
-from typing import Optional
-import warnings
-from data_wrangling import specific_utils, general_utils
-from data_wrangling import process_monkey_information
-from planning_analysis.show_planning import examine_null_arcs
-
+import math
 import os
-import numpy as np
+import warnings
+from math import pi
+from typing import Optional
+
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from data_wrangling import (general_utils, process_monkey_information,
+                            specific_utils)
 from matplotlib import rc
-from math import pi
-import os
-import math
+from planning_analysis.show_planning import examine_null_arcs
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

@@ -3,11 +3,6 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_rel, wilcoxon
-
-
-import numpy as np
-import pandas as pd
-from scipy.stats import ttest_rel, wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 

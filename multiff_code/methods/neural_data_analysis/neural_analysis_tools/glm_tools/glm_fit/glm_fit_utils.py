@@ -1,16 +1,16 @@
-from statsmodels.stats.multitest import multipletests
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import plot_spikes, plot_glm_fit
-
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
-import statsmodels.api as sm
-from pathlib import Path
-from sklearn.model_selection import GroupKFold, KFold
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import warnings
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import (
+    plot_glm_fit, plot_spikes)
+from scipy import stats
+from sklearn.model_selection import GroupKFold, KFold
+from statsmodels.stats.multitest import multipletests
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 
 def add_fdr(coefs_df, alpha: float = 0.05, by_term: bool = True,

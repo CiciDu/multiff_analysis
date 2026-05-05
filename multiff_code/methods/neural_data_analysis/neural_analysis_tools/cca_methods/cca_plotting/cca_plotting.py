@@ -1,17 +1,13 @@
-from machine_learning.ml_methods import ml_plotting_utils
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import math
-import seaborn as sns
 import logging
-from scipy.stats import pearsonr
-import colorcet
-
-
-import numpy as np
-import matplotlib.pyplot as plt
 import math
+
+import colorcet
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from machine_learning.ml_methods import ml_plotting_utils
+from scipy.stats import pearsonr
 
 
 def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X',

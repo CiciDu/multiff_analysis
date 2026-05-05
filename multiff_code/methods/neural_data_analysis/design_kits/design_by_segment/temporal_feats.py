@@ -5,12 +5,10 @@ from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
-    prep_target_data,
-)
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import \
+    prep_target_data
 from scipy import signal
 
 

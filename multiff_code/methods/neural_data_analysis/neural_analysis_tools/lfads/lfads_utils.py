@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def make_raw_fr_from_spikes(
     spikes_df,
     clusters,

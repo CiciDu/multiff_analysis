@@ -1,18 +1,17 @@
 
 
-from reinforcement_learning.agents.rnn import rnn_env
-from reinforcement_learning.base_classes import rl_base_utils, rl_base_class
-from reinforcement_learning.agents.rnn import lstm_utils
-from reinforcement_learning.agents.rnn import gru_utils
-from reinforcement_learning.base_classes import env_utils
-from reinforcement_learning.agents.rnn import lstm_class
-
-import os
-import pandas as pd
-import gc
-import pickle
-import io
 import copy
+import gc
+import io
+import os
+import pickle
+
+import pandas as pd
+from reinforcement_learning.agents.rnn import (gru_utils, lstm_class,
+                                               lstm_utils, rnn_env)
+from reinforcement_learning.base_classes import (env_utils, rl_base_class,
+                                                 rl_base_utils)
+
 retrieve_buffer = False
 n_steps = 1000
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

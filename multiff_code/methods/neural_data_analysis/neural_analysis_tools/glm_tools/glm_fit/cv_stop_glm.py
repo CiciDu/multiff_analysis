@@ -1,10 +1,11 @@
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import poisson
 from sklearn.model_selection import GroupKFold
-from typing import Optional
 
 # ---------- helpers ----------
 

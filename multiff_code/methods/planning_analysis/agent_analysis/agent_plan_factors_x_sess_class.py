@@ -1,21 +1,20 @@
 
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-from planning_analysis.agent_analysis import agent_plan_factors_class
-from planning_analysis.factors_vs_indicators import variations_base_class
-from planning_analysis.factors_vs_indicators import make_variations_utils
-from reinforcement_learning.base_classes import rl_base_class
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
-from reinforcement_learning.agents.feedforward import sb3_class
-from reinforcement_learning.base_classes import rl_base_utils
-
-import pandas as pd
 import os
 import sys
 import warnings
 from contextlib import contextmanager, redirect_stdout
 from os.path import exists
+
+import pandas as pd
+from planning_analysis.agent_analysis import (agent_plan_factors_class,
+                                              compare_monkey_and_agent_utils)
+from planning_analysis.factors_vs_indicators import (make_variations_utils,
+                                                     variations_base_class)
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.show_planning import show_planning_class
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from reinforcement_learning.agents.feedforward import sb3_class
+from reinforcement_learning.base_classes import rl_base_class, rl_base_utils
 
 
 @contextmanager

@@ -1,12 +1,13 @@
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.plan_factors import build_factor_comp
-from visualization.plotly_tools import plotly_plot_class
-from visualization.matplotlib_tools import plot_behaviors_utils, matplotlib_plot_class
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_monkey_heading_helper_class
-from matplotlib.lines import Line2D
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.graph_objects as go
+from matplotlib.lines import Line2D
+from planning_analysis.plan_factors import build_factor_comp
+from planning_analysis.show_planning.cur_vs_nxt_ff import (
+    find_cvn_utils, plot_monkey_heading_helper_class)
+from visualization.matplotlib_tools import (matplotlib_plot_class,
+                                            plot_behaviors_utils)
+from visualization.plotly_tools import plotly_plot_class
 
 
 class _PlotCurVsNxtFF(plotly_plot_class.PlotlyPlotter, matplotlib_plot_class.MatplotlibPlotter):

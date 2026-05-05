@@ -29,9 +29,8 @@ print("[PYTHON][DEBUG] All imports completed successfully", flush=True)
 # Main
 # -------------------------------------------------------
 def main(args):
-    from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-        one_ff_pgam_pipeline,
-    )
+    from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+        one_ff_pgam_pipeline
 
 
     print(f"[PYTHON][DEBUG] main() called for unit_idx={args.unit_idx}", flush=True)

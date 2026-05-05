@@ -1,8 +1,8 @@
-from planning_analysis.factors_vs_indicators import make_variations_utils
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import make_variations_utils, variations_base_class
-from planning_analysis.factors_vs_indicators import process_variations_utils
-
+from planning_analysis.agent_analysis import (agent_plan_factors_x_sess_class,
+                                              compare_monkey_and_agent_utils)
+from planning_analysis.factors_vs_indicators import (make_variations_utils,
+                                                     process_variations_utils,
+                                                     variations_base_class)
 
 # This class collects data from many agents and compares them
 

@@ -1,9 +1,13 @@
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_monkey_heading_helper_class
-from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
-from visualization import base_plot_class
+import copy
+
 import numpy as np
 import plotly.graph_objects as go
-import copy
+from planning_analysis.show_planning.cur_vs_nxt_ff import \
+    plot_monkey_heading_helper_class
+from visualization import base_plot_class
+from visualization.plotly_tools import (plotly_for_monkey,
+                                        plotly_for_null_arcs,
+                                        plotly_preparation)
 
 
 class PlotlyPlotter(base_plot_class.BasePlotter):

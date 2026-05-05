@@ -1,12 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
-from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import bootstrap_ci
-
 from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
-    compute_timepoint_pvals,
-    cluster_permutation_test
-)
+    bootstrap_ci, cluster_permutation_test, compute_timepoint_pvals)
 
 # ----------------------------------------------------------
 # Projection over time

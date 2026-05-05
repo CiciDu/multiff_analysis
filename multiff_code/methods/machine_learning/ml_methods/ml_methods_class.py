@@ -1,19 +1,17 @@
-from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
+import warnings
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import BaggingRegressor, AdaBoostRegressor, RandomForestRegressor
-from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-import numpy as np
-from sklearn.metrics import r2_score
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import train_test_split
-import warnings
+from machine_learning.ml_methods import (classification_utils,
+                                         prep_ml_data_utils, regression_utils)
+from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor,
+                              RandomForestRegressor)
 from sklearn.linear_model import Lasso
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
 class MlMethods():

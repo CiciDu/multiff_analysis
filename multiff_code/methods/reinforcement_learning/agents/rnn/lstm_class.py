@@ -1,21 +1,19 @@
 
 
-from reinforcement_learning.agents.rnn import rnn_env
-from reinforcement_learning.base_classes import rl_base_utils, rl_base_class
-from reinforcement_learning.agents.rnn import lstm_utils
-from reinforcement_learning.agents.rnn import gru_utils
-from reinforcement_learning.base_classes import env_utils
-from reinforcement_learning.base_classes import run_logger
-
-import os
-import matplotlib.pyplot as plt
-import pandas as pd
-import gc
-import torch
-import numpy as np
-import pickle
-import io
 import copy
+import gc
+import io
+import os
+import pickle
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import torch
+from reinforcement_learning.agents.rnn import gru_utils, lstm_utils, rnn_env
+from reinforcement_learning.base_classes import (env_utils, rl_base_class,
+                                                 rl_base_utils, run_logger)
+
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000

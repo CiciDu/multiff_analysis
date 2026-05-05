@@ -3,13 +3,9 @@ import pandas as pd
 from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    one_ff_glm_design,
-    one_ff_pipeline,
-    one_ff_parameters
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_glm_design, one_ff_parameters, one_ff_pipeline)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
     one_ff_gam_fit
-)
 
 DEFAULT_ENCODING_VAR_CATEGORIES = {
     'sensory_vars': ['v', 'w'],

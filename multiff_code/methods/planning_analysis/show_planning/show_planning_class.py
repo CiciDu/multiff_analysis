@@ -1,21 +1,18 @@
 
-from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
-from planning_analysis.factors_vs_indicators import make_variations_utils
-
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from data_wrangling import combine_info_utils, base_processing_class
-
-
-import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-import pandas as pd
-import warnings
 import contextlib
+import os
+import warnings
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import base_processing_class, combine_info_utils
+from matplotlib import rc
+from planning_analysis.factors_vs_indicators import make_variations_utils
+from planning_analysis.show_planning import show_planning_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff import (cvn_from_ref_class,
+                                                           find_cvn_utils)
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

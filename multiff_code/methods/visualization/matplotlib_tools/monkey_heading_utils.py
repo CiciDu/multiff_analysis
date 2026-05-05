@@ -1,18 +1,15 @@
 
-from visualization.animation import animation_utils
-from decision_making_analysis.data_enrichment import trajectory_utils
-
-import numpy as np
 import math
 import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-import math
-import seaborn as sns
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from decision_making_analysis.data_enrichment import trajectory_utils
+from matplotlib import rc
+from visualization.animation import animation_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

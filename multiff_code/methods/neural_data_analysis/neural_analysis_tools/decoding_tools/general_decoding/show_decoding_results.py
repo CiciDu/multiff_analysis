@@ -1,18 +1,16 @@
 import os
 import pickle
-import pandas as pd
 from pathlib import Path
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from data_wrangling import combine_info_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
+    cv_decoding
 from scipy.stats import ttest_rel
 from statsmodels.stats.multitest import multipletests
-
-
-
-from data_wrangling import combine_info_utils
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
-
 
 # ==========================================================
 # VARIABLE CATEGORIES (DECODING)
@@ -78,9 +76,7 @@ def collect_all_session_decoding_results(
     """
     # Local import avoids circular import: decoding_models -> plot_decoding_utils -> this module.
     from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
-        decoding_models,
-        decoding_runner,
-    )
+        decoding_models, decoding_runner)
 
     sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
         raw_data_dir_name,

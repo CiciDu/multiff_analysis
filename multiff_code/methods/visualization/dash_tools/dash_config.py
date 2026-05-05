@@ -4,11 +4,12 @@ Centralizes matplotlib, pandas, and other configuration settings.
 """
 
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from matplotlib import rc
 
 
 def configure_plotting_environment():

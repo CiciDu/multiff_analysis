@@ -1,10 +1,12 @@
+import os
+
+import pandas as pd
 from data_wrangling import base_processing_class
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            build_factor_comp_utils)
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.plan_factors import build_factor_comp, build_factor_comp_utils
 from visualization.plotly_tools import plotly_plot_class
-import pandas as pd
-import os
 
 
 class _FindCurVsNxtFF(base_processing_class.BaseProcessing):

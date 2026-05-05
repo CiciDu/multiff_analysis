@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as sts
 
+
 # ------------------------------------------------------------
 # Added tuning fraction calculations
 # ------------------------------------------------------------
@@ -275,8 +276,8 @@ def plot_tuning_heatmap(
     return fig, ax
 
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_fraction_tuned(tuning_stats):

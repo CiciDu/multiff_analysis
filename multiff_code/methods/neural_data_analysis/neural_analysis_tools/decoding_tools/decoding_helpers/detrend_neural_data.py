@@ -1,11 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
+    decoding_diagnostics
 from scipy.ndimage import gaussian_filter1d
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
-    decoding_diagnostics,
-)
 
 def _estimate_slow_drift(spike_rate_hz, bin_size, drift_sigma_s):
     '''

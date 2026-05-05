@@ -1,14 +1,15 @@
 
-from planning_analysis.factors_vs_indicators import make_variations_utils
-from planning_analysis import ml_for_planning_class, ml_for_planning_utils
-from machine_learning.ml_methods import ml_methods_class
 import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 from os.path import exists
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from machine_learning.ml_methods import ml_methods_class
+from matplotlib import rc
+from planning_analysis import ml_for_planning_class, ml_for_planning_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

@@ -1,6 +1,7 @@
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 import numpy as np
 import pandas as pd
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
 
 
 def get_rebinned_var_lags(rebinned_var, trial_vector, lag_numbers=None, rebinned_max_lag_number=2):

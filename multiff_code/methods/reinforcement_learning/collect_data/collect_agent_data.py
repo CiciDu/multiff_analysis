@@ -1,31 +1,28 @@
-from data_wrangling import process_monkey_information
-from pattern_discovery import make_ff_dataframe
-from reinforcement_learning.agents.rnn import rnn_env
-from reinforcement_learning.agents.feedforward import sb3_env
-from reinforcement_learning.agents.attention.env_attn_multiff import (
-    get_action_limits as attn_get_action_limits,
-)
-from reinforcement_learning.collect_data.process_agent_data import (
-    find_flash_time_for_one_ff,
-    make_ff_flash_sorted,
-    make_env_ff_flash_from_real_data,
-    unpack_ff_information_of_agent,
-    reverse_value_and_position,
-)
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
-
-import os
-import shutil
-import numpy as np
-import torch
-import matplotlib
-import pandas as pd
-import math
-from matplotlib import rc
-from math import pi
 import logging
+import math
+import os
 import random
+import shutil
+from math import pi
+
+import matplotlib
+import numpy as np
+import pandas as pd
+import torch
+from data_wrangling import process_monkey_information
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from gymnasium import spaces
+from matplotlib import rc
+from pattern_discovery import make_ff_dataframe
+from reinforcement_learning.agents.attention.env_attn_multiff import \
+    get_action_limits as attn_get_action_limits
+from reinforcement_learning.agents.feedforward import sb3_env
+from reinforcement_learning.agents.rnn import rnn_env
+from reinforcement_learning.collect_data.process_agent_data import (
+    find_flash_time_for_one_ff, make_env_ff_flash_from_real_data,
+    make_ff_flash_sorted, reverse_value_and_position,
+    unpack_ff_information_of_agent)
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 rc('animation', html='jshtml')

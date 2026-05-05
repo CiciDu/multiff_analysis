@@ -1,32 +1,29 @@
-import json
 import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
-from joblib import Parallel, delayed
+from typing import Any, Dict, Optional, Sequence, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from typing import Sequence, Tuple, Optional, Dict, Any
-
-from sklearn.model_selection import StratifiedKFold, GridSearchCV, RandomizedSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import roc_auc_score, make_scorer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-import matplotlib.pyplot as plt
-
+from joblib import Parallel, delayed
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import (
+    decoding_utils, plot_decoding)
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import \
+    compare_events
 from scipy import stats
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
 # classifiers
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import make_scorer, roc_auc_score
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     StratifiedKFold)
 from sklearn.neural_network import MLPClassifier
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import decoding_utils
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import compare_events
-from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import plot_decoding
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 
 def _json_default(o):

@@ -1,10 +1,11 @@
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy import stats
-from typing import Optional
 
 
 # ---------- Helpers ----------

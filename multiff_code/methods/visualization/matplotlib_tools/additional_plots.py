@@ -1,13 +1,14 @@
-from visualization.matplotlib_tools import plot_trials, plot_behaviors_utils
-from data_wrangling import further_processing_class, combine_info_utils
-
 import os
-import seaborn as sns
-import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+import numpy as np
+import seaborn as sns
+from data_wrangling import combine_info_utils, further_processing_class
 from matplotlib import cm
 from matplotlib_scalebar.scalebar import ScaleBar
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

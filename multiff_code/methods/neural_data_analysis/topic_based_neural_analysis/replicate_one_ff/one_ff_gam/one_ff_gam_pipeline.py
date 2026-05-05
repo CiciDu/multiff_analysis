@@ -2,19 +2,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    one_ff_parameters,
-)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    one_ff_parameters
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    backward_elimination,
-    gam_variance_explained,
-    one_ff_gam_design,
-    one_ff_gam_fit,
-    plot_gam_fit,
-    penalty_tuning,
-)
-
+    backward_elimination, gam_variance_explained, one_ff_gam_design,
+    one_ff_gam_fit, penalty_tuning, plot_gam_fit)
 
 DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w"],
@@ -150,7 +142,7 @@ class OneFFGAMRunner:
             fit_kwargs=self._default_fit_kwargs(),
             save_path=save_path,
             load_if_exists=load_if_exists,
-            cv_mode="blocked_time_buffered",
+            cv_mode="group_kfold",
             buffer_samples=buffer_samples,
         )
 
@@ -556,10 +548,12 @@ class OneFFGAMRunner:
         lambda_config: Optional[Dict[str, float]] = None,
         alpha: float = 0.05,
         n_folds: int = 10,
-        cv_mode: str = 'blocked_time_buffered',
+        cv_mode: str = 'group_kfold',
         buffer_samples: int = 20,
+        trial_ids=None,
         load_if_exists: bool = True,
         retrieve_only: bool = False,
+        n_jobs: int = 1,
     ) -> Dict:
         """
         Run backward elimination for one unit.
@@ -614,6 +608,9 @@ class OneFFGAMRunner:
         self.lam_suffix = lam_suffix
         save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
 
+        if trial_ids is None and cv_mode == 'group_kfold' and self.data_obj is not None:
+            trial_ids = self.data_obj.get_cv_groups_for_design(self.design_df)
+
         kept, history = backward_elimination.backward_elimination_gam(
             design_df=self.design_df,
             y=self.y,
@@ -622,6 +619,8 @@ class OneFFGAMRunner:
             n_folds=n_folds,
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
+            trial_ids=trial_ids,
+            n_jobs=n_jobs,
             verbose=True,
             save_path=str(save_path),
             load_if_exists=False,

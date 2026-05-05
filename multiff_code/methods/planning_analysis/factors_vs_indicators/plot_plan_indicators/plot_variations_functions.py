@@ -1,14 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 from planning_analysis.factors_vs_indicators import process_variations_utils
 from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
-    plot_variations_utils,
-    plot_variations_utils_mpl,
-    parent_assembler,
-    parent_assembler_mpl,
-    plot_styles_mpl,
-)
+    parent_assembler, parent_assembler_mpl, plot_styles_mpl,
+    plot_variations_utils, plot_variations_utils_mpl)
 
 # ---------------------------------------------------------------------
 # Small helpers

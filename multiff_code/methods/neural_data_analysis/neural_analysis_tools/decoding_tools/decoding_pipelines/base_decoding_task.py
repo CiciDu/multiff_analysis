@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
+import os
 import pickle
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-import os 
-
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-    decoding_design_utils,
-    smooth_neural_data,
-)
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
+    decoding_design_utils, smooth_neural_data)
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
 
 
 class BaseDecodingTask:
@@ -198,7 +197,8 @@ class BaseDecodingTask:
     def _ensure_spike_history_features_materialized(self):
         if self.spike_history_features is not None:
             return
-        from neural_data_analysis.design_kits.design_by_segment import spike_history as spike_history_kit
+        from neural_data_analysis.design_kits.design_by_segment import \
+            spike_history as spike_history_kit
         if self.bin_df is None:
             raise RuntimeError("bin_df required for spike history — set use_spike_history=True before collect_data.")
         pn = getattr(self, "pn", None)
@@ -286,9 +286,9 @@ class BaseDecodingTask:
     def get_processed_spike_rates(self):
         if self.processed_spike_rates is not None:
             return
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-            decoding_design_utils,
-        )
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import \
+            decoding_design_utils
+
         # Smooth/detrend full-session binned rates from spikes_df — not binned_spikes,
         # which is only filled after collect_data builds event-aligned matrices.
         pn = getattr(self, "pn", None)

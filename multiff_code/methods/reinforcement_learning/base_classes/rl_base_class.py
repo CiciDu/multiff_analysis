@@ -1,28 +1,28 @@
-from data_wrangling import retrieve_raw_data, process_monkey_information
-from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
-from visualization.matplotlib_tools import plot_statistics
-from visualization.animation import animation_class, animation_utils
-from reinforcement_learning.agents.rnn import rnn_env
-from reinforcement_learning.agents.feedforward import sb3_env
-from reinforcement_learning.collect_data import collect_agent_data, process_agent_data
-from reinforcement_learning.agents.feedforward import interpret_neural_network, sb3_utils
-from reinforcement_learning.base_classes import rl_base_utils
-from reinforcement_learning.base_classes import run_logger
-from reinforcement_learning.base_classes import base_env
-from reinforcement_learning.base_classes import env_utils
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
-
-
-import time as time_package
+import copy
 import gc
 import json
 import os
+import time as time_package
+from os.path import exists
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from os.path import exists
-import copy
 import torch
+from data_wrangling import process_monkey_information, retrieve_raw_data
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import \
+    prep_target_data
+from pattern_discovery import make_ff_dataframe, organize_patterns_and_features
+from reinforcement_learning.agents.feedforward import (
+    interpret_neural_network, sb3_env, sb3_utils)
+from reinforcement_learning.agents.rnn import rnn_env
+from reinforcement_learning.base_classes import (base_env, env_utils,
+                                                 rl_base_utils, run_logger)
+from reinforcement_learning.collect_data import (collect_agent_data,
+                                                 process_agent_data)
+from visualization.animation import animation_class, animation_utils
+from visualization.matplotlib_tools import plot_statistics
+
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000

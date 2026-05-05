@@ -1,11 +1,12 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
-import matplotlib as mpl
 import math
 
-from pattern_discovery.learning.proportion_trend import analyze_proportion_trend
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.ticker import PercentFormatter
+from pattern_discovery.learning.proportion_trend import \
+    analyze_proportion_trend
 
 # ---------- helpers (unchanged API where possible) ----------
 

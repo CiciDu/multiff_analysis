@@ -1,11 +1,12 @@
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from data_wrangling import general_utils
+import itertools
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import itertools
-import matplotlib.pyplot as plt
 import seaborn as sns
-
+from data_wrangling import general_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_class, plot_variations_utils)
 
 all_x_vars_of_interest = ['test_or_control',
                           'ref_columns_only',

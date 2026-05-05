@@ -1,6 +1,7 @@
-from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_monkey_heading_helper_class
 from data_wrangling import further_processing_class
+from null_behaviors import show_null_trajectory
+from planning_analysis.show_planning.cur_vs_nxt_ff import \
+    plot_monkey_heading_helper_class
 
 
 class BasePlotter():

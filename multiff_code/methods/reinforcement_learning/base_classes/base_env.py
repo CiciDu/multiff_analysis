@@ -1,15 +1,12 @@
 # machine_learning/RL_models/env_related/MultiFF.py
-from typing import Optional, Dict
-from dataclasses import dataclass
-from reinforcement_learning.base_classes import env_utils
-
-import numpy as np
 import math
+from dataclasses import dataclass
 from math import pi
-import gymnasium
-from typing import List
-from typing import Union
+from typing import Dict, List, Optional, Union
 
+import gymnasium
+import numpy as np
+from reinforcement_learning.base_classes import env_utils
 
 # ---- Tunables for transforms ----
 DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)

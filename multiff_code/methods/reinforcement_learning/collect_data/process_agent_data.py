@@ -1,11 +1,11 @@
-from data_wrangling import general_utils
-from pattern_discovery import pattern_by_trials, make_ff_dataframe
-from reinforcement_learning.collect_data import collect_agent_data
-
 import os
 import shutil
+
 import numpy as np
 import pandas as pd
+from data_wrangling import general_utils
+from pattern_discovery import make_ff_dataframe, pattern_by_trials
+from reinforcement_learning.collect_data import collect_agent_data
 
 
 def find_flash_time_for_one_ff(ff_flash, lifetime):

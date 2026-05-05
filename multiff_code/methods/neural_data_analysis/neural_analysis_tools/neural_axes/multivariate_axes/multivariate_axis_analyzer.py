@@ -1,25 +1,16 @@
 # multivariate_axis_analyzer.py
 import numpy as np
-
 from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
-    build_continuous_fr,
-    events_to_bins,
-    extract_event_windows,
-    orthogonalize_axes,
-    axis_angle,
-)
-
-from .multivariate_axis_utils import (
-    build_interaction_terms,
-    fit_multitask_linear,
-    reduced_rank_regression,
-)
-
-from .conditioned_timecourse import ConditionedTimecourseMixin
-from .peri_event_trajectory import PeriEventTrajectoryMixin
-
+    axis_angle, build_continuous_fr, events_to_bins, extract_event_windows,
+    orthogonalize_axes)
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
+
+from .conditioned_timecourse import ConditionedTimecourseMixin
+from .multivariate_axis_utils import (build_interaction_terms,
+                                      fit_multitask_linear,
+                                      reduced_rank_regression)
+from .peri_event_trajectory import PeriEventTrajectoryMixin
 
 
 class MultivariateAxisAnalyzer(ConditionedTimecourseMixin, PeriEventTrajectoryMixin):

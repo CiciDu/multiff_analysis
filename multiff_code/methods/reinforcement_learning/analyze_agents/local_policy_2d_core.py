@@ -2,9 +2,7 @@ from itertools import combinations
 
 import numpy as np
 import pandas as pd
-
 from reinforcement_learning.analyze_agents import analyze_policy_smoothness
-
 
 DEFAULT_DELTA_VALUES = np.linspace(-0.15, 0.15, 21, dtype=np.float32)
 

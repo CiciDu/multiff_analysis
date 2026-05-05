@@ -1,11 +1,9 @@
 import numpy as np
-from scipy.io import loadmat
 import pandas as pd
-
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    one_ff_data_processing,
-    population_analysis_utils,
-)
+    one_ff_data_processing, population_analysis_utils)
+from scipy.io import loadmat
+
 
 class OneFFSessionData:
     def __init__(self, mat_path, prs, session_num=0):
@@ -190,3 +188,9 @@ class OneFFSessionData:
 
     def get_binned_spikes_df(self):
         return pd.DataFrame(self.Y, columns=np.arange(self.n_units))
+
+    def get_cv_groups_for_design(self, design_df=None):
+        trial_ids = getattr(self, 'covariate_trial_ids', None)
+        if trial_ids is None:
+            return None
+        return np.asarray(trial_ids)

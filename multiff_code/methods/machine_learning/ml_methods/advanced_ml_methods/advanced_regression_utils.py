@@ -1,32 +1,29 @@
+import inspect
+import json
 import os
 import time
-import json
-import inspect
 from datetime import datetime
 
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 import sklearn
-
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor,
+                              ExtraTreesRegressor, GradientBoostingRegressor,
+                              HistGradientBoostingRegressor,
+                              RandomForestRegressor)
+from sklearn.linear_model import (ElasticNet, HuberRegressor, Lasso,
+                                  LinearRegression, RANSACRegressor, Ridge,
+                                  SGDRegressor)
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import GridSearchCV, KFold
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-
-from sklearn.linear_model import (
-    LinearRegression, Ridge, Lasso, ElasticNet,
-    HuberRegressor, RANSACRegressor, SGDRegressor
-)
 from sklearn.svm import SVR, LinearSVR
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.ensemble import (
-    RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor,
-    HistGradientBoostingRegressor, AdaBoostRegressor, BaggingRegressor
-)
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.neural_network import MLPRegressor
 
 
 def use_advanced_model_for_regression(

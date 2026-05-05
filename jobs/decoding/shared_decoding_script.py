@@ -4,9 +4,7 @@ import argparse
 from typing import Any, Optional, Type, TypeVar
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
-    decoding_models,
-    decoding_runner,
-)
+    decoding_models, decoding_runner)
 
 TaskT = TypeVar("TaskT")
 
@@ -16,7 +14,7 @@ def run_decoding_main(
     *,
     model_class = decoding_models.CVDecodingModel,
     cv_mode: str = "blocked_time_buffered",
-    use_spike_history: bool = True,
+    use_spike_history: bool = False,
     run_kwargs: Optional[dict[str, Any]] = None,
     task_kwargs: Optional[dict[str, Any]] = None,
     model_kwargs: Optional[dict[str, Any]] = None,

@@ -3,6 +3,7 @@
 # ============================================================
 import os
 
+
 def save_figure(fig, filename, backend='plotly', formats=('png', 'pdf', 'svg')):
     """
     Save figures from either backend (Plotly or Matplotlib).

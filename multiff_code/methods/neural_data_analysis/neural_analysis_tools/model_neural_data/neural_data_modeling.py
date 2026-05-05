@@ -1,17 +1,16 @@
-import sys
 import os
 import sys
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
-from matplotlib import rc
-from sklearn.linear_model import LinearRegression
-from sklearn.cross_decomposition import CCA as SklearnCCA
-import statsmodels.api as sm
-from cca_zoo.linear import rCCA
 from types import SimpleNamespace
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from cca_zoo.linear import rCCA
+from matplotlib import rc
+from sklearn.cross_decomposition import CCA as SklearnCCA
+from sklearn.linear_model import LinearRegression
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

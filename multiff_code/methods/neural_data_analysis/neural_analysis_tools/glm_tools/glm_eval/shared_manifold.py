@@ -1,6 +1,6 @@
 # shared_manifold_plots.py
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def _smooth_1d(x, k=1):
@@ -100,8 +100,8 @@ def plot_shared_components(
 
     return figs
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import cm
 from matplotlib.colors import Normalize
 
@@ -194,8 +194,8 @@ def plot_shared_phase_plane(
     plt.tight_layout()
     return fig
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import cm
 from matplotlib.colors import Normalize
 

@@ -1,11 +1,12 @@
-from null_behaviors import curv_of_traj_utils
-
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
-from data_wrangling import base_processing_class
-import pandas as pd
 import os
+
 import pandas as pd
+from data_wrangling import base_processing_class
+from null_behaviors import curv_of_traj_utils
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            plan_factors_utils)
+from planning_analysis.show_planning.cur_vs_nxt_ff import (cvn_from_ref_class,
+                                                           find_cvn_utils)
 
 # note, one class instance is either for test or control, but not both
 

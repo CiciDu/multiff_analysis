@@ -1,7 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+
 
 def compute_r2(y_true, y_pred):
     ss_res = np.sum((y_true - y_pred) ** 2)
@@ -31,6 +32,7 @@ def plot_neurons_over_time(X, neuron_indices):
     plt.show()
 
 import numpy as np
+
 
 def find_high_corr_pairs(X_tr, threshold=0.7, max_print=20):
     """
@@ -96,6 +98,7 @@ def compute_vif_matrix(X_tr):
     
     
 import numpy as np
+
 
 def analyze_singular_values(X_tr, print_smallest_k=10):
     """

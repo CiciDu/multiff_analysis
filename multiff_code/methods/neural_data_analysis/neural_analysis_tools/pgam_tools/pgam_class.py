@@ -1,4 +1,3 @@
-from sklearn.preprocessing import StandardScaler
 import math
 import os
 import sys
@@ -6,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
+from sklearn.preprocessing import StandardScaler
 
 PGAM_PATH = Path(
     'multiff_analysis/external/pgam/src'
@@ -36,15 +35,14 @@ for path in [pgam_src, pgam_src_pg]:
     if str(path) not in sys.path:
         sys.path.append(str(path))
 
-from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
-    plot_modeling_result
-)
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
 import PGAM.gam_data_handlers as gdh
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import \
+    _build_folds
+from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
+    plot_modeling_result
 from PGAM.GAM_library import *
 from post_processing import postprocess_results
-
 
 
 class LoadedModelData:

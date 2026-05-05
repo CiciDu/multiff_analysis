@@ -1,12 +1,14 @@
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from reinforcement_learning.base_classes import rl_base_utils
-from reinforcement_learning.agents.feedforward import sb3_class
+import os
 
 import pandas as pd
-import os
+from planning_analysis.agent_analysis import (agent_plan_factors_x_sess_class,
+                                              compare_monkey_and_agent_utils)
+from planning_analysis.factors_vs_indicators import process_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import \
+    plot_variations_utils
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from reinforcement_learning.agents.feedforward import sb3_class
+from reinforcement_learning.base_classes import rl_base_utils
 
 
 class PlanFactorsAcrossAgents():

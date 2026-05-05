@@ -1,7 +1,9 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import drop_high_vif_vars
+import re
+
 import numpy as np
 import pandas as pd
-import re
+from neural_data_analysis.neural_analysis_tools.model_neural_data import \
+    drop_high_vif_vars
 
 
 def drop_columns_with_high_corr(var_df_lags, corr_threshold_for_lags=0.85, verbose=True,

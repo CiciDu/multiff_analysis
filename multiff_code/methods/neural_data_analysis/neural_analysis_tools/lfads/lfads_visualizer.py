@@ -1,9 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter1d
 from sklearn.decomposition import PCA
-
 
 # =====================================================================
 # Helper: compute “raw” FR from spikes_df (10 ms bins) to compare vs LFADS

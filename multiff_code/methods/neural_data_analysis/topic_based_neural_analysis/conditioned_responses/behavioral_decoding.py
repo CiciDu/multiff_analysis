@@ -759,7 +759,6 @@ def get_summary_df(
 
 
 # ── aggregate summaries ──────────────────────────────────────────────────────
-
 def print_aggregate_stats(summary_df: pd.DataFrame) -> None:
     print('\n── mean accuracy per variable/condition ──')
     print(summary_df.groupby(['variable', 'condition'])[['acc', 'chance']].mean())

@@ -1,14 +1,15 @@
-from data_wrangling import combine_info_utils, base_processing_class, specific_utils
-from planning_analysis import ml_for_planning_class
-from planning_analysis.only_cur_ff import only_cur_ff_class
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.factors_vs_indicators import make_variations_utils
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-import pandas as pd
+import gc
 import os
 from os.path import exists
-import gc
+
 import pandas as pd
+from data_wrangling import (base_processing_class, combine_info_utils,
+                            specific_utils)
+from planning_analysis import ml_for_planning_class
+from planning_analysis.factors_vs_indicators import make_variations_utils
+from planning_analysis.only_cur_ff import only_cur_ff_class
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 
 
 class OnlyStopFFAcrossSessions():

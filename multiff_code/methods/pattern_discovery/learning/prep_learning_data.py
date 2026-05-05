@@ -1,20 +1,23 @@
 
-from scipy import stats
-from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from data_wrangling import specific_utils, process_monkey_information, base_processing_class, combine_info_utils, further_processing_class
-
-from pattern_discovery.learning.proportion_trend import analyze_proportion_trend
-
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-import statsmodels.formula.api as smf
-import statsmodels.api as sm
 import os
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from data_wrangling import (base_processing_class, combine_info_utils,
+                            further_processing_class,
+                            process_monkey_information, specific_utils)
+from pattern_discovery.learning.proportion_trend import \
+    analyze_proportion_trend
+from planning_analysis.factors_vs_indicators import (make_variations_utils,
+                                                     process_variations_utils)
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_class, plot_variations_utils)
+from scipy import stats
+from scipy.stats import norm
 
 
 def get_key_learning_data(

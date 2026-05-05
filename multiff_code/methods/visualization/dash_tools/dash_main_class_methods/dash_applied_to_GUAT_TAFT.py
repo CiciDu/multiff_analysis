@@ -1,21 +1,20 @@
-from visualization.dash_tools.dash_main_class_methods import dash_main_class
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_class
-from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
-
-import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 import copy
+import os
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_class
+from matplotlib import rc
+from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+# Import shared configuration
+from visualization.dash_tools.dash_config import configure_plotting_environment
+from visualization.dash_tools.dash_main_class_methods import dash_main_class
 
 # Import neural data visualization tools
 
-# Import shared configuration
-from visualization.dash_tools.dash_config import configure_plotting_environment
 configure_plotting_environment()
 
 # Configuration - moved to a shared config module or base class

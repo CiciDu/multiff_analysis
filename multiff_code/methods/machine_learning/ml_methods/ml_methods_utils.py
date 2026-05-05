@@ -1,12 +1,11 @@
+import math
 from typing import Optional
 
-from machine_learning.ml_methods import classification_utils, regression_utils
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold
-from sklearn.model_selection import GroupKFold
-import math
+import numpy as np
+import pandas as pd
+from machine_learning.ml_methods import classification_utils, regression_utils
+from sklearn.model_selection import GroupKFold, KFold
 
 
 def process_summary_df(summary_df):

@@ -1,17 +1,14 @@
 import re
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    one_ff_parameters
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    backward_elimination,
-    gam_variance_explained,
-    one_ff_gam_design,
-    one_ff_gam_fit,
-    plot_gam_fit,
-    penalty_tuning,
-)
+    backward_elimination, gam_variance_explained, one_ff_gam_design,
+    one_ff_gam_fit, penalty_tuning, plot_gam_fit)
+
 
 def category_contributions_to_df(category_contributions):
     """
@@ -213,8 +210,8 @@ def plot_category_ecdf(
         Use log-scaled x-axis.
     """
 
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
 
     # --------------------------------------------------
     # 1) Collect all categories present across neurons

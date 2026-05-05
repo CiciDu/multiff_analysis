@@ -1,38 +1,32 @@
-from machine_learning.ml_methods import ml_methods_utils
-
 import copy
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
+import statsmodels.api as sm
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import statsmodels.api as sm
-from sklearn.model_selection import cross_validate
-
-from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
-from sklearn.metrics import (
-    accuracy_score, balanced_accuracy_score, precision_score, recall_score,
-    f1_score, matthews_corrcoef, roc_auc_score, classification_report,
-    confusion_matrix
-)
-
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from machine_learning.ml_methods import ml_methods_utils
+from sklearn.ensemble import (AdaBoostClassifier, BaggingClassifier,
+                              ExtraTreesClassifier, GradientBoostingClassifier,
+                              RandomForestClassifier)
+from sklearn.linear_model import (LogisticRegression, RidgeClassifier,
+                                  SGDClassifier)
+from sklearn.metrics import (accuracy_score, balanced_accuracy_score,
+                             classification_report, confusion_matrix, f1_score,
+                             matthews_corrcoef, precision_score, recall_score,
+                             roc_auc_score)
+from sklearn.model_selection import (StratifiedKFold, cross_val_score,
+                                     cross_validate, train_test_split)
 from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression, SGDClassifier, RidgeClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import (
-    BaggingClassifier, RandomForestClassifier, ExtraTreesClassifier,
-    AdaBoostClassifier, GradientBoostingClassifier
-)
-
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
-
 
 # Optional external libs (guard if unavailable):
 try:

@@ -1,16 +1,9 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-import pandas as pd
-import numpy as np
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from sklearn.cluster import AgglomerativeClustering
+
 
 def reorder_based_on_clustering(data):
     clust = sns.clustermap(data, cmap='coolwarm', vmin=-1, vmax=1, annot=False)

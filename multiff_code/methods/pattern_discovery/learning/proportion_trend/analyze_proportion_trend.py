@@ -1,27 +1,17 @@
 
-from typing import Literal, Optional, Dict, Tuple
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-from matplotlib.ticker import PercentFormatter
-import seaborn as sns
-
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import statsmodels.formula.api as smf
-from statsmodels.stats.proportion import proportions_ztest
-from scipy.stats import fisher_exact, norm
 from math import sqrt
+from typing import Dict, Literal, Optional, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 import statsmodels.api as sm
-
-
+import statsmodels.formula.api as smf
+from matplotlib.ticker import PercentFormatter
+from scipy.stats import fisher_exact, norm
 # --- NEW: helpers for Early vs Late p-value ---------------------------------
 from statsmodels.stats.proportion import proportions_ztest
-from scipy.stats import fisher_exact
-import numpy as np
 
 
 def test_early_late(phase_df_sub, item):

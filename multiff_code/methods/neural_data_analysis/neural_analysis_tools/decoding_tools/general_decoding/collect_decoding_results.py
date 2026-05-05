@@ -1,4 +1,5 @@
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import show_decoding_results
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
+    show_decoding_results
 
 
 def collect_results_over_param(

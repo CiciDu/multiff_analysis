@@ -36,24 +36,15 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.model_selection import GroupKFold
-
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoder_gam_helper,
-    encoding_design_utils,
-    linear_model_utils,
-    process_encode_design,
-)
+    encoder_gam_helper, encoding_design_utils, linear_model_utils,
+    process_encode_design)
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    gam_variance_explained,
-    one_ff_gam_fit,
-)
+    gam_variance_explained, one_ff_gam_fit)
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    FitResult,
-    GroupSpec,
-)
-
+    FitResult, GroupSpec)
+from sklearn.model_selection import GroupKFold
 
 # ===========================================================================
 # Shared base
@@ -617,6 +608,7 @@ class PGAMModel(BaseEncodingModel):
         fit_kwargs: Optional[Dict] = None,
         save_path: Optional[str] = None,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
         save_metadata: Optional[Dict] = None,
         verbose: bool = True,
         dt: Optional[float] = None,
@@ -639,12 +631,18 @@ class PGAMModel(BaseEncodingModel):
             save_path = paths["cv_save_path"]
 
         maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
-            save_path=save_path, load_if_exists=load_if_exists, verbose=verbose
+            save_path=save_path,
+            load_if_exists=(load_if_exists or retrieve_only),
+            verbose=verbose,
         )
         if maybe_loaded is not None:
             if verbose:
-                print(f"[PGAMModel] Loaded cached CV results from: {save_path}")
+                print(f'[PGAMModel] Loaded cached CV results from: {save_path}')
             return maybe_loaded
+        if retrieve_only:
+            raise FileNotFoundError(
+                f'No cached CV result found at: {save_path}'
+            )
 
         design_df, gam_groups = self._get_design_for_unit(task, unit_idx)
 
@@ -813,6 +811,7 @@ class PGAMModel(BaseEncodingModel):
         retrieve_only: bool = False,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
+        n_jobs: int = 1,
     ) -> Dict:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         return self._get_analysis_helper(task).run_backward_elimination(
@@ -824,6 +823,7 @@ class PGAMModel(BaseEncodingModel):
             retrieve_only=retrieve_only,
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
+            n_jobs=n_jobs,
         )
 
     def crossval_tuning_curve_coef(
@@ -907,6 +907,7 @@ class PGAMModel(BaseEncodingModel):
         verbose: bool = True,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
+        n_jobs: int = 1,
     ) -> None:
         """Category contributions + backward elimination for one unit."""
         if verbose:
@@ -926,6 +927,7 @@ class PGAMModel(BaseEncodingModel):
                 load_if_exists=load_if_exists,
                 cv_mode=cv_mode,
                 buffer_samples=buffer_samples,
+                n_jobs=n_jobs,
             )
         except Exception as e:
             if verbose:
@@ -943,6 +945,7 @@ class PGAMModel(BaseEncodingModel):
         verbose: bool = True,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
+        n_jobs: int = 1,
     ) -> None:
         task.collect_data(exists_ok=True)
         task._prepare_spike_history_components()
@@ -959,6 +962,7 @@ class PGAMModel(BaseEncodingModel):
                 verbose=verbose,
                 cv_mode=cv_mode,
                 buffer_samples=buffer_samples,
+                n_jobs=n_jobs,
             )
 
 
@@ -1247,9 +1251,8 @@ class RNNModel(BaseEncodingModel):
             epoch_losses    List[List[float]]
             cv_mode         str
         """
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
-            _build_folds,
-        )
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import \
+            _build_folds
 
         task.collect_data(exists_ok=True)
 

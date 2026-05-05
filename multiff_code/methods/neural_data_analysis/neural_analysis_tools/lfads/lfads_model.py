@@ -1,7 +1,8 @@
+from typing import Dict, Tuple
+
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from typing import Dict, Tuple
+from torch.utils.data import DataLoader, Dataset
 
 
 class LFADSDataset(Dataset):

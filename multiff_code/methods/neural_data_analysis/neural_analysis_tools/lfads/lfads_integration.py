@@ -1,13 +1,15 @@
+import os
+from typing import Dict, Optional
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Optional
-import os
-
 import torch
 from torch.utils.data import DataLoader
 
-from .lfads_prep import make_continuous_lfads_trials, stitch_lfads_rates_to_continuous
-from .lfads_model import LFADSDataset, LFADSModel, lfads_train_epoch, lfads_eval_epoch, LFADSControllerModel
+from .lfads_model import (LFADSControllerModel, LFADSDataset, LFADSModel,
+                          lfads_eval_epoch, lfads_train_epoch)
+from .lfads_prep import (make_continuous_lfads_trials,
+                         stitch_lfads_rates_to_continuous)
 
 
 def run_lfads_on_continuous_session(

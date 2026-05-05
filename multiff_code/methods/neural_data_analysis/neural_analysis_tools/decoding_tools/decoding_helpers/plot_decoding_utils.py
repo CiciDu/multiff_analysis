@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from typing import Dict, Optional, Sequence, Tuple
-from matplotlib.ticker import MaxNLocator
 
-from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding, show_decoding_results
+from matplotlib.ticker import MaxNLocator, MultipleLocator
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
+    cv_decoding, show_decoding_results)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import \
+    plot_one_ff_decoding
 
 
 # This has yet to be verified as working
@@ -356,9 +357,11 @@ def build_shared_decoder_comparison_df(
     return df_compare
 
 
-import numpy as np
-import matplotlib.pyplot as plt
 import math
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 def add_score_column(results_df, regression_metric='r_cv', classification_metric='auc_mean'):
     # Assign unified score column

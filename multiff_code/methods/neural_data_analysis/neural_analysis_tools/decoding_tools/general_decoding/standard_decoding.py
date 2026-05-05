@@ -1,17 +1,17 @@
 import numpy as np
-
-from sklearn.model_selection import GroupKFold
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.metrics import roc_auc_score, average_precision_score
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
-
-from neural_data_analysis.design_kits.design_by_segment import create_pn_design_df
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from data_wrangling import general_utils
+from neural_data_analysis.design_kits.design_by_segment import \
+    create_pn_design_df
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.model_selection import GroupKFold
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 
 # ---------------------------------------------------------------------

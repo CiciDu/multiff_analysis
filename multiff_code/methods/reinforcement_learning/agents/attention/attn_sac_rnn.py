@@ -22,17 +22,16 @@ NOTES FOR READERS (why some choices were made):
   • Burn-in builds RNN hidden states on a prefix without backprop to stabilize sequence training.
 '''
 
+import copy
+import csv
+import math
+import os
 # ===========================
 # Standard library imports
 # ===========================
 from collections import deque
-from typing import Optional, Dict, List
-import os
-import csv
-import math
-from typing import Dict, Any, List, Tuple, Optional
 from contextlib import nullcontext
-import copy
+from typing import Any, Dict, List, Optional, Tuple
 
 # ===========================
 # Third-party imports
@@ -41,20 +40,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-# NOTE: these are project-local imports; expected to be available in your repo
-from reinforcement_learning.attention.env_attn_multiff import (
-    # Gym-like environment wrapper exposing MultiFF observations
-    EnvForAttentionSAC,
-    # helper to read per-dimension action ranges from the env
-    get_action_limits,
-    # numpy -> (slot_feats, slot_mask, self_feats)
-    seq_obs_to_attn_tensors,
-    # torch -> (slot_feats, slot_mask, self_feats)
-    seq_obs_to_attn_tensors_torch
-)
 from reinforcement_learning.attention import set_transformers
-
+# NOTE: these are project-local imports; expected to be available in your repo
+from reinforcement_learning.attention.env_attn_multiff import (  # Gym-like environment wrapper exposing MultiFF observations; helper to read per-dimension action ranges from the env; numpy -> (slot_feats, slot_mask, self_feats); torch -> (slot_feats, slot_mask, self_feats)
+    EnvForAttentionSAC, get_action_limits, seq_obs_to_attn_tensors,
+    seq_obs_to_attn_tensors_torch)
 
 # ---------------------------
 # Utilities

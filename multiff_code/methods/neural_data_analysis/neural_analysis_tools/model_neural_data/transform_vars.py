@@ -1,8 +1,9 @@
+from functools import partial
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from functools import partial
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
+from sklearn.preprocessing import StandardScaler
 
 
 def transform_behav_data(behav_data,

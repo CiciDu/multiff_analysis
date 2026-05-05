@@ -1,16 +1,16 @@
 
-from visualization.matplotlib_tools import plot_behaviors_utils
-from eye_position_analysis import eye_positions
-
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import matplotlib.colors as mcolors
+from eye_position_analysis import eye_positions
+from matplotlib import rc
+from visualization.matplotlib_tools import plot_behaviors_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

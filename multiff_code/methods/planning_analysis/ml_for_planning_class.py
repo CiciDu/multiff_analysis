@@ -1,6 +1,7 @@
-from machine_learning.ml_methods import regression_utils, ml_methods_class
-import pandas as pd
 import gc
+
+import pandas as pd
+from machine_learning.ml_methods import ml_methods_class, regression_utils
 
 
 class MlForPlanning(ml_methods_class.MlMethods):

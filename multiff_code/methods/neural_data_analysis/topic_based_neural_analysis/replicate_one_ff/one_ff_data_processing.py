@@ -15,7 +15,6 @@ Author: you
 
 import numpy as np
 
-
 # =========================
 # Core integrals
 # =========================

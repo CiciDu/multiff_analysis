@@ -8,17 +8,15 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoding_design_utils,
-    multiff_encoding_params,
-)
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    collect_stop_data,
-)
+    encoding_design_utils, multiff_encoding_params)
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import \
+    collect_stop_data
 
 
 class BaseEncodingTask:
@@ -360,9 +358,8 @@ class BaseEncodingTask:
         return result
 
     def clean_var_categories(self):
-        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-            encoder_gam_helper,
-        )
+        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+            encoder_gam_helper
 
         self.var_categories = encoding_design_utils.build_clean_var_categories_from_meta(
             self.var_categories, self.structured_meta_groups

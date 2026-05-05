@@ -1,11 +1,12 @@
 import math
-import pandas as pd
-from visualization.matplotlib_tools import monkey_heading_utils
-from null_behaviors import opt_arc_utils
-
 import os
 import warnings
+
 import numpy as np
+import pandas as pd
+from null_behaviors import opt_arc_utils
+from visualization.matplotlib_tools import monkey_heading_utils
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

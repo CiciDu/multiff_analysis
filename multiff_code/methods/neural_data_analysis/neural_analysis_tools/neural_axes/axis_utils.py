@@ -1,17 +1,16 @@
-from scipy.stats import mannwhitneyu
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
-from sklearn.linear_model import LogisticRegression, Ridge
+from scipy.stats import mannwhitneyu
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.svm import SVC
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.svm import SVC
 from sklearn.utils.class_weight import compute_sample_weight
+
 
 # -----------------------------------------------------------
 # Continuous FR construction
@@ -163,7 +162,8 @@ def fit_behavior_axis(X, y, model='logreg', **kwargs):
 # -----------------------------------------------------------
 import numpy as np
 from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.model_selection import KFold, StratifiedKFold
+
 
 # -----------------------------------------------------------
 def find_best_accuracy_threshold(prob, y_true):
@@ -189,13 +189,10 @@ def find_best_accuracy_threshold(prob, y_true):
 # -----------------------------------------------------------
 
 
-from sklearn.model_selection import StratifiedKFold, KFold
-from sklearn.metrics import accuracy_score, roc_auc_score
 import numpy as np
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import KFold, StratifiedKFold
 
-from sklearn.model_selection import StratifiedKFold, KFold
-from sklearn.metrics import accuracy_score, roc_auc_score
-import numpy as np
 
 def _fit_preprocess_fr(X):
     mu = X.mean(axis=0, keepdims=True)

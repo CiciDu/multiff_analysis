@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy import stats
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-
-from pattern_discovery.learning.proportion_trend import analyze_proportion_trend
+from pattern_discovery.learning.proportion_trend import \
+    analyze_proportion_trend
+from scipy import stats
 
 
 def fit_poisson_by_session(df_sessions: pd.DataFrame,
@@ -189,9 +189,11 @@ def extract_estimates_from_ols_fit(ols):
 
 
 from typing import Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 
 def plot_duration_fit(
     df_trials: pd.DataFrame,
@@ -318,26 +320,13 @@ def plot_duration_fit(
 
 
 
-from typing import Optional, Iterable, Literal, Union, Tuple, Dict
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+from typing import Dict, Iterable, Literal, Optional, Tuple, Union
 
-from typing import Optional, Iterable, Literal, Union, Dict, Tuple
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from typing import Optional, Iterable, Literal, Union, Dict, Tuple
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-from typing import Optional, Iterable, Literal, Union, Dict, Tuple
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+
 
 def plot_poisson_rate_fit(
     df_sessions: pd.DataFrame,

@@ -1,11 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from catboost import CatBoostRegressor
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
+    cv_decoding
 from sklearn.preprocessing import StandardScaler
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
-    cv_decoding,
-)
 
 
 class ConfigRegressionEstimator:

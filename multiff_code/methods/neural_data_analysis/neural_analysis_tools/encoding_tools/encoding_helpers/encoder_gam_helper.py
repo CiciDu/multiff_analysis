@@ -1,27 +1,20 @@
 from __future__ import annotations
 
+import copy
+import os
+import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-import copy
-import pickle
-import os
-
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    backward_elimination,
-    gam_variance_explained,
-    one_ff_gam_fit,
-    penalty_tuning,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    GroupSpec,
-)
-
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
-
-
+    backward_elimination, gam_variance_explained, one_ff_gam_fit,
+    penalty_tuning)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import \
+    GroupSpec
 
 DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w", "accel", "ang_accel"],
@@ -617,6 +610,7 @@ class BaseEncodingGAMAnalysisHelper:
         retrieve_only: bool = False,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
+        n_jobs: int = 1,
     ) -> Dict:
         outdir = self._neuron_outdir(unit_idx)
         resolved_cv = (
@@ -676,6 +670,7 @@ class BaseEncodingGAMAnalysisHelper:
                 n_folds=n_folds,
                 cv_mode=resolved_cv,
                 buffer_samples=buffer_samples,
+                n_jobs=n_jobs,
                 verbose=True,
                 save_path=str(save_path),
                 load_if_exists=load_if_exists,
@@ -908,7 +903,7 @@ class BaseEncodingGAMAnalysisHelper:
         cv_mode: Optional[str],
         cv_groups,
     ):
-        from sklearn.model_selection import KFold, TimeSeriesSplit, GroupKFold
+        from sklearn.model_selection import GroupKFold, KFold, TimeSeriesSplit
 
         if cv_mode is None:
             return KFold(

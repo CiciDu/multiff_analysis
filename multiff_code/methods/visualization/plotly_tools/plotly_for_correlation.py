@@ -1,16 +1,15 @@
 
-from null_behaviors import curv_of_traj_utils
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
-import pandas as pd
-from dash import html, dcc
-from dash.exceptions import PreventUpdate
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import matplotlib
+from dash import dcc, html
+from dash.exceptions import PreventUpdate
+from matplotlib import rc
+from null_behaviors import curv_of_traj_utils
 from scipy import stats
 
 plt.rcParams["animation.html"] = "html5"

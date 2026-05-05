@@ -1,11 +1,12 @@
+import os
+from math import pi
+
+import numpy as np
+import pandas as pd
 from data_wrangling import specific_utils
 from pattern_discovery import ff_dataframe_utils
 from visualization.matplotlib_tools import plot_behaviors_utils
 
-import os
-import numpy as np
-import pandas as pd
-from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
@@ -197,9 +198,8 @@ def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
 def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted):
 
     ff_dataframe['abs_delta_ff_angle'], ff_dataframe['abs_delta_ff_angle_boundary'] = specific_utils.calculate_change_in_abs_ff_angle(current_ff_index=ff_dataframe['ff_index'].values, angles_to_ff=ff_dataframe['ff_angle'].values,
-                                                                                                                                      angles_to_boundaries=ff_dataframe['ff_angle_boundary'].values, ff_real_position_sorted=ff_real_position_sorted, monkey_x_array=ff_dataframe[
-                                                                                                                                          'monkey_x'].values, monkey_y_array=ff_dataframe['monkey_y'].values,
-                                                                                                                                      monkey_angles_array=ff_dataframe['monkey_angle'].values, in_memory_indices=ff_dataframe['point_index'].values)
+                                                                                                                                      angles_to_boundaries=ff_dataframe['ff_angle_boundary'].values, ff_real_position_sorted=ff_real_position_sorted, 
+                                                                                                                                      monkey_information=monkey_information, point_indices=ff_dataframe['point_index'].values)
 
     # Add some columns (they shall not be saved in csv for the sake of saving space)
     ff_dataframe['target_index'] = np.searchsorted(

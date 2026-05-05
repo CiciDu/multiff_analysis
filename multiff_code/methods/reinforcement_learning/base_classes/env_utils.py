@@ -1,9 +1,9 @@
 import inspect
 import math
 import os
+from typing import Optional
 
 import numpy as np
-from typing import Optional
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 

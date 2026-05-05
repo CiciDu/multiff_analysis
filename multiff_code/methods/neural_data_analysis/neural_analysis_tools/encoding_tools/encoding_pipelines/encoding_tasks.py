@@ -16,27 +16,18 @@ from __future__ import annotations
 import os
 
 from neural_data_analysis.design_kits.design_by_segment import (
-    spike_history,
-    spatial_feats,
-    temporal_feats,
-    create_pn_design_df,
-)
+    create_pn_design_df, spatial_feats, spike_history, temporal_feats)
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoder_gam_helper,
-    encode_stops_utils,
-    encode_fs_utils,
-    encode_pn_utils,
-    encoding_design_utils,
-)
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
+    encode_fs_utils, encode_pn_utils, encode_stops_utils, encoder_gam_helper,
+    encoding_design_utils)
+from neural_data_analysis.topic_based_neural_analysis.ff_visibility import \
+    decode_vis_utils
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    collect_stop_data,
-    decode_stops_design,
-)
-from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
+    collect_stop_data, decode_stops_design)
 
 from .base_encoding_task import BaseEncodingTask
-
 
 # ---------------------------------------------------------------------------
 # PNEncodingTask

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run One-FF population decoding (canoncorr + linear readout) for a session."""
+import argparse
 import os
 import sys
 from pathlib import Path
 
-import argparse
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -20,15 +20,13 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    one_ff_parameters
 # ---------------------------------------------------------------------
 # Project-specific imports
 # ---------------------------------------------------------------------
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-    one_ff_decoding_pipeline,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    one_ff_parameters,
-)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import \
+    one_ff_decoding_pipeline
 
 # ---------------------------------------------------------------------
 # Global config

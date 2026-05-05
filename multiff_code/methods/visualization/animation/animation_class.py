@@ -1,23 +1,18 @@
-from data_wrangling import specific_utils, further_processing_class
-from data_wrangling import general_utils
-from visualization.matplotlib_tools import plot_trials
-from visualization.animation import animation_utils, animation_func
-from data_wrangling import specific_utils
-
-import os
 import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from os.path import exists
 from functools import partial
-from matplotlib import animation
-from IPython.display import Video, HTML
+from os.path import exists
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import (further_processing_class, general_utils,
+                            specific_utils)
+from IPython.display import HTML, Video
+from matplotlib import animation, rc
+from visualization.animation import animation_func, animation_utils
+from visualization.matplotlib_tools import plot_trials
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

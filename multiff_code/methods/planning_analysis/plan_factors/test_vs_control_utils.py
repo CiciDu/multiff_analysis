@@ -1,10 +1,9 @@
 
-import pandas as pd
-import numpy as np
 import math
-import pandas as pd
 from math import pi
 
+import numpy as np
+import pandas as pd
 
 
 def change_control_data_to_conform_to_test_data(plan_features_test, plan_features_ctrl):

@@ -1,21 +1,22 @@
-from visualization.dash_tools import dash_utils
-from visualization.dash_tools.dash_main_class_methods import dash_main_helper_class
-from visualization.dash_tools.dash_config import DEFAULT_PORT, DEFAULT_EXTERNAL_STYLESHEETS
-
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from dash import Dash, html, Input, State, Output, ctx
-from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
+from dash import Dash, Input, Output, State, ctx, html
+from dash.exceptions import PreventUpdate
+from matplotlib import rc
+from visualization.dash_tools import dash_utils
+# Import shared configuration
+from visualization.dash_tools.dash_config import (
+    DEFAULT_EXTERNAL_STYLESHEETS, DEFAULT_PORT, configure_plotting_environment)
+from visualization.dash_tools.dash_main_class_methods import \
+    dash_main_helper_class
 
 # Import neural data visualization tools
 
-# Import shared configuration
-from visualization.dash_tools.dash_config import configure_plotting_environment
 configure_plotting_environment()
 
 # Configuration - moved to a shared config module or base class

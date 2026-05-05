@@ -1,9 +1,9 @@
 import copy
-import pandas as pd
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import smooth_neural_data
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
-import numpy as np
 
+import numpy as np
+import pandas as pd
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
+    detrend_neural_data, smooth_neural_data)
 
 # ==========================================================
 # VARIABLE CATEGORIES (DECODING)

@@ -1,15 +1,20 @@
-from abc import abstractmethod
-from data_wrangling import specific_utils, specific_utils, general_utils
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.gpfa_methods import fit_gpfa_utils
-from neural_data_analysis.neural_analysis_tools.align_trials import time_resolved_regression, time_resolved_gpfa_regression, plot_time_resolved_regression, align_trial_utils
-import warnings
 import os
-import pandas as pd
-from elephant.gpfa import GPFA
-import quantities as pq
-from sklearn.decomposition import PCA
 import pickle
+import warnings
+from abc import abstractmethod
+
+import pandas as pd
+import quantities as pq
+from data_wrangling import general_utils, specific_utils
+from elephant.gpfa import GPFA
+from neural_data_analysis.neural_analysis_tools.align_trials import (
+    align_trial_utils, plot_time_resolved_regression,
+    time_resolved_gpfa_regression, time_resolved_regression)
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.neural_analysis_tools.gpfa_methods import \
+    fit_gpfa_utils
+from sklearn.decomposition import PCA
 
 
 class GPFAHelperClass():

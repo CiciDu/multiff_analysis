@@ -1,25 +1,19 @@
-from decision_making_analysis.ff_data_acquisition import ff_data_utils
-from decision_making_analysis. ff_data_acquisition import free_selection
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_trials, plot_behaviors_utils
-from pattern_discovery import pattern_by_points
-from data_wrangling import specific_utils, general_utils
-
-
-import os
-from math import pi
 import math
 import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 from math import pi
-import seaborn as sns
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from data_wrangling import general_utils, specific_utils
+from decision_making_analysis.ff_data_acquisition import (ff_data_utils,
+                                                          free_selection)
+from matplotlib import rc
+from pattern_discovery import pattern_by_points
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

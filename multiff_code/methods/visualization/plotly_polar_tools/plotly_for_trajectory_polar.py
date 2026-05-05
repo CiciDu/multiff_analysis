@@ -1,12 +1,13 @@
 
+import math
 import os
-import numpy as np
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
-import math
+from matplotlib import rc
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

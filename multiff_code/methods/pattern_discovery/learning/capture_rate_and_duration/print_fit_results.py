@@ -1,6 +1,7 @@
+from typing import Optional
+
 import pandas as pd
 from IPython.display import display
-from typing import Optional
 
 # ---------- formatting helpers ----------
 

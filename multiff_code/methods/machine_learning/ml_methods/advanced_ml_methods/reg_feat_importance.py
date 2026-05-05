@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-
+from sklearn.base import is_regressor
+from sklearn.compose import ColumnTransformer
 from sklearn.inspection import permutation_importance
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.base import is_regressor
+
 
 # ---------------------------
 # Helpers for feature names

@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import rebinned_alignment
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
+    detrend_neural_data, rebinned_alignment)
 
 
 def rebinned_x_var_to_binned_spike_rates_hz(

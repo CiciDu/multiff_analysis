@@ -1,7 +1,9 @@
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.plan_factors import test_vs_control_utils
-from planning_analysis.plan_factors import build_factor_comp_utils, build_factor_comp, feature_lists
 import pandas as pd
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            build_factor_comp_utils,
+                                            feature_lists,
+                                            test_vs_control_utils)
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 
 
 def make_plan_features1(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided_window):

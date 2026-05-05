@@ -1,5 +1,5 @@
-from visualization.plotly_tools import plotly_for_monkey
 from visualization.matplotlib_tools import monkey_heading_utils
+from visualization.plotly_tools import plotly_for_monkey
 
 
 class PlotMonkeyHeadingHelper():

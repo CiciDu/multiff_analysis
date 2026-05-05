@@ -16,18 +16,18 @@ Features:
   - AMP (mixed precision) optional
 """
 
-import os
+import copy
 import csv
 import math
-from typing import Dict, Any, List, Tuple, Optional
+import os
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import copy
-
-from reinforcement_learning.attention.env_attn_multiff import EnvForAttentionSAC, get_action_limits, batch_obs_to_attn_tensors
+from reinforcement_learning.attention.env_attn_multiff import (
+    EnvForAttentionSAC, batch_obs_to_attn_tensors, get_action_limits)
 
 
 # ---------------------------

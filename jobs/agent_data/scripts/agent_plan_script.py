@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run One-FF population decoding (canoncorr + linear readout) for a session."""
+import argparse
 import os
 import sys
 from pathlib import Path
 
-import argparse
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -20,7 +20,9 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
-from planning_analysis.agent_analysis import agent_plan_factors_x_sess_class, agent_plan_factors_x_agents_class
+from planning_analysis.agent_analysis import (
+    agent_plan_factors_x_agents_class, agent_plan_factors_x_sess_class)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Run agent planning analysis')

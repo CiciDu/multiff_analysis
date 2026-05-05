@@ -1,11 +1,12 @@
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Dict
-from sklearn.model_selection import KFold
 from sklearn.cross_decomposition import CCA
-from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
 
 # ============================================================
 # Utilities

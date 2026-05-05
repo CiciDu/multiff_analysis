@@ -72,6 +72,7 @@ def resolve_event_windows_vectorized(new_seg_info, start_cols, end_cols):
 
 import plotly.graph_objects as go
 
+
 def plot_3d_raster_plotly(
     aligned_spike_trains,
     new_seg_info,

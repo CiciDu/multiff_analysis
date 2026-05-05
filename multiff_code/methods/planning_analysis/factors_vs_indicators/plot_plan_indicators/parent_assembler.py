@@ -1,8 +1,9 @@
 # parent_assembler.py
 import re
+
 import numpy as np
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 def _axes_domains(fig):

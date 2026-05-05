@@ -1,16 +1,17 @@
-from scipy.stats import pearsonr
-from matplotlib.ticker import FixedLocator
-from scipy import stats
-import os
-import seaborn as sns
 import math
-import numpy as np
+import os
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+import numpy as np
 import plotly.express as px
+import seaborn as sns
+from matplotlib.ticker import FixedLocator, MaxNLocator
+from scipy import stats
+from scipy.stats import pearsonr
 from sklearn.linear_model import LinearRegression
-from matplotlib.ticker import MaxNLocator
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

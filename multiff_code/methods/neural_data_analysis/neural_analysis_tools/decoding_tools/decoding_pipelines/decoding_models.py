@@ -30,26 +30,19 @@ import re
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import one_ff_style_utils
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-    plot_decoding_utils,
-    decoding_model_specs,
-)
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    linear_model_utils,
-    process_encode_design,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
+    decoding_model_specs, plot_decoding_utils)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import \
+    one_ff_style_utils
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
-    cv_decoding,
-    show_decoding_results,
-    plot_decoding_predictions,
-)
-
+    cv_decoding, plot_decoding_predictions, show_decoding_results)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    linear_model_utils, process_encode_design)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import \
+    plot_one_ff_decoding
 
 # ===========================================================================
 # Shared base
@@ -682,7 +675,8 @@ class CVDecodingModel(BaseDecodingModel):
         model_name, model_save_path, config, n_splits, candidate_widths,
         inner_cv_splits, cv_mode, verbosity, shuffle_mode, detrend_covariates=None,
     ):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import \
+            _build_folds
 
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         y_df = task.get_target_df()
@@ -847,14 +841,13 @@ class CVDecodingModel(BaseDecodingModel):
         kernelwidth_by_feature=None, detrend_cov_train=None, detrend_cov_test=None,
         fold_train_idx=None, fold_test_idx=None,
     ):
-        from catboost import CatBoostRegressor, CatBoostError
+        from catboost import CatBoostError, CatBoostRegressor
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
+            _maybe_detrend_neural, _shuffle_y_for_fold, infer_decoding_type)
         from sklearn.linear_model import LogisticRegression
         from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score
         from sklearn.preprocessing import LabelEncoder, StandardScaler
         from sklearn.utils.multiclass import type_of_target
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
-            infer_decoding_type, _shuffle_y_for_fold, _maybe_detrend_neural,
-        )
 
         rng = np.random.default_rng(0)
         buffer_samples = getattr(config, "buffer_samples", 20)

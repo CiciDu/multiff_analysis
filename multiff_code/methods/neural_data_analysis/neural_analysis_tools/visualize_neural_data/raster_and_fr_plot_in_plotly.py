@@ -1,13 +1,16 @@
 import logging
-import numpy as np
-import plotly.graph_objects as go
 from typing import Optional
 
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import get_colors_utils
-from visualization.plotly_tools import plotly_for_time_series
-from visualization.plotly_tools.plotly_for_time_series import plot_blocks_to_show_ff_visible_segments_in_fig_time_series
-from visualization.plotly_tools import plotly_plot_class
+import numpy as np
+import plotly.graph_objects as go
+from neural_data_analysis.neural_analysis_tools.get_neural_data import \
+    neural_data_processing
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
+    get_colors_utils
+from visualization.plotly_tools import (plotly_for_time_series,
+                                        plotly_plot_class)
+from visualization.plotly_tools.plotly_for_time_series import \
+    plot_blocks_to_show_ff_visible_segments_in_fig_time_series
 
 
 def create_firing_rate_plot_for_one_duration_in_plotly(

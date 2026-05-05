@@ -1,15 +1,14 @@
-from pattern_discovery import patterns_and_features_class
-from visualization.matplotlib_tools import plot_change_over_time
-
 import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import plotly.express as px
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from matplotlib import rc
+from pattern_discovery import patterns_and_features_class
+from visualization.matplotlib_tools import plot_change_over_time
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

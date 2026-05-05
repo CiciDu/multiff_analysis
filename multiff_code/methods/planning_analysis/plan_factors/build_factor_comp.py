@@ -1,11 +1,12 @@
+import math
+
+import numpy as np
+from data_wrangling import specific_utils
+from planning_analysis.only_cur_ff import only_cur_ff_utils
+from planning_analysis.plan_factors import (build_factor_comp_utils,
+                                            plan_factors_utils)
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.only_cur_ff import only_cur_ff_utils
-from planning_analysis.plan_factors import build_factor_comp_utils
-from planning_analysis.plan_factors import plan_factors_utils
-from data_wrangling import specific_utils
-import numpy as np
-import math
 
 
 def get_eye_toward_ff_time_perc_df(data_of_segments, ff_to_include=['cur_ff', 'nxt_ff'],

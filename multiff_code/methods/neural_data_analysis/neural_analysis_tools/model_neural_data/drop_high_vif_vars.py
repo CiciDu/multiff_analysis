@@ -1,14 +1,12 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import drop_high_corr_vars
 import os
+from os.path import exists
+
 import numpy as np
 import pandas as pd
+from neural_data_analysis.neural_analysis_tools.model_neural_data import \
+    drop_high_corr_vars
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
-from os.path import exists
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
-import pandas as pd
-
 
 
 def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_initial_subset=5, verbose=True,

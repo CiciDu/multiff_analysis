@@ -1,19 +1,15 @@
+from typing import Dict, List, Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Tuple, Optional
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
+    cross_validate_axis, extract_event_windows)
 
-from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import cross_validate_axis
-
-import numpy as np
-import matplotlib.pyplot as plt
-from .axis_visualization import (
-    plot_window_heatmap,
-    plot_event_aligned_projection,
-    plot_event_projection_hist,
-    plot_event_projection_scatter,
-)
-from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import extract_event_windows
-from .axis_visualization import plot_window_heatmap
+from .axis_visualization import (plot_event_aligned_projection,
+                                 plot_event_projection_hist,
+                                 plot_event_projection_scatter,
+                                 plot_window_heatmap)
 
 
 def window_search_dashboard(

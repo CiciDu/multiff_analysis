@@ -1,11 +1,13 @@
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import KFold
-from sklearn.cross_decomposition import CCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression
 from dataclasses import dataclass
 from typing import List, Optional
+
+import numpy as np
+import pandas as pd
+from sklearn.cross_decomposition import CCA
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
+
 
 # ============================================================
 # Utility: convert DataFrame / Series to NumPy safely
@@ -211,6 +213,7 @@ def evaluate_lag_block_in_full_model(
 
 import matplotlib.pyplot as plt
 import numpy as np
+
 
 def plot_lag_block_loadings(partial_loadings: np.ndarray,
                             best_single_indices=None,

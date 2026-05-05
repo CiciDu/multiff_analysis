@@ -1,15 +1,14 @@
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import find_tuning_curves
-
-
 import os
-import numpy as np
+
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib import rc
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import \
+    find_tuning_curves
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from sklearn.linear_model import LinearRegression
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

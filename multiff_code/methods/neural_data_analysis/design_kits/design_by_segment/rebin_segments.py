@@ -1,20 +1,13 @@
 # new script
 # new script
 
+import numpy as np
+import pandas as pd
 from data_wrangling import specific_utils
-from planning_analysis.plan_indicators import diff_in_curv_utils
-import numpy as np
-import pandas as pd
 from neural_data_analysis.design_kits.design_around_event.event_binning import (
-    build_bin_assignments,
-    bin_timeseries_weighted,
-    bin_spikes_by_cluster,
-    event_windows_to_bins2d,
-)
-
-import numpy as np
-import pandas as pd
-
+    bin_spikes_by_cluster, bin_timeseries_weighted, build_bin_assignments,
+    event_windows_to_bins2d)
+from planning_analysis.plan_indicators import diff_in_curv_utils
 
 
 def _make_left_hold_signal_from_df(

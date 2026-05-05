@@ -3,17 +3,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
-
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_class
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    one_ff_pipeline,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_pgam_design,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_parameters import (
-    default_prs,
-)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    one_ff_pipeline
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    one_ff_pgam_design
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_parameters import \
+    default_prs
 
 DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w"],

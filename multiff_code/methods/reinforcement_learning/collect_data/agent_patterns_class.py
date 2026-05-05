@@ -1,20 +1,19 @@
 
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-from planning_analysis.agent_analysis import agent_plan_factors_class
-from planning_analysis.factors_vs_indicators import variations_base_class
-from pattern_discovery import organize_patterns_and_features
-from reinforcement_learning.base_classes import rl_base_class
-from pattern_discovery import patterns_and_features_class
-from reinforcement_learning.agents.feedforward import sb3_class
-from pattern_discovery import make_ff_dataframe
-
-import pandas as pd
 import os
 import warnings
 from os.path import exists
-import os
+
+import pandas as pd
+from pattern_discovery import (make_ff_dataframe,
+                               organize_patterns_and_features,
+                               patterns_and_features_class)
+from planning_analysis.agent_analysis import agent_plan_factors_class
+from planning_analysis.factors_vs_indicators import variations_base_class
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.show_planning import show_planning_class
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from reinforcement_learning.agents.feedforward import sb3_class
+from reinforcement_learning.base_classes import rl_base_class
 
 # This class collects data from many agents and compares them
 

@@ -1,11 +1,12 @@
-from visualization.matplotlib_tools import plot_behaviors_utils
-from null_behaviors import show_null_trajectory, find_best_arc
-from matplotlib.lines import Line2D
-import os
-import numpy as np
-import matplotlib.pyplot as plt
 import math
+import os
 from math import pi
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.lines import Line2D
+from null_behaviors import find_best_arc, show_null_trajectory
+from visualization.matplotlib_tools import plot_behaviors_utils
 
 # -----------------------------------------------------------------------------
 # Module-level settings

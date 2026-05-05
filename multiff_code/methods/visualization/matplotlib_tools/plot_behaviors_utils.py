@@ -1,24 +1,21 @@
-from data_wrangling import general_utils
-from visualization.matplotlib_tools import plot_polar, plot_trials
-from eye_position_analysis import eye_positions
-
-import os
 import math
-import seaborn as sns
+import os
+from math import pi
+
+import matplotlib
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib
-import matplotlib.pyplot as plt
+import seaborn as sns
+from data_wrangling import general_utils
+from eye_position_analysis import eye_positions
 from matplotlib import cm
+from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from matplotlib_scalebar.scalebar import ScaleBar
-from math import pi
-import matplotlib.patches as mpatches
-import matplotlib.lines as mlines
-
-import matplotlib.lines as mlines
-from matplotlib.legend_handler import HandlerTuple
-
+from visualization.matplotlib_tools import plot_polar, plot_trials
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 

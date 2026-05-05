@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import pandas as pd
-import numpy as np
-import matplotlib
-from pathlib import Path
-import sys
 import os
+import sys
+from pathlib import Path
+
+import matplotlib
+import numpy as np
+import pandas as pd
+
 print("[PYTHON][DEBUG] Script started, beginning imports...", flush=True)
 
 
@@ -28,9 +30,8 @@ else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_pipeline,
-)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    one_ff_gam_pipeline
 
 # ---------------------------------------------------------------------
 # Project-specific imports

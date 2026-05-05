@@ -1,17 +1,18 @@
 
-from reinforcement_learning.agents.feedforward import sb3_env
-from reinforcement_learning.base_classes import rl_base_class, rl_base_utils
-from reinforcement_learning.agents.feedforward import sb3_utils
-from reinforcement_learning.base_classes import env_utils
-
 import os
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-from stable_baselines3 import SAC
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 import torch.nn as nn
+from reinforcement_learning.agents.feedforward import sb3_env, sb3_utils
+from reinforcement_learning.base_classes import (env_utils, rl_base_class,
+                                                 rl_base_utils)
+from stable_baselines3 import SAC
+from stable_baselines3.common.callbacks import (EvalCallback,
+                                                StopTrainingOnRewardThreshold)
+from stable_baselines3.common.monitor import Monitor
+
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000

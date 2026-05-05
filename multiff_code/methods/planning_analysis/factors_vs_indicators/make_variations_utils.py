@@ -1,15 +1,16 @@
 
-from scipy import stats
-from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.plan_factors import build_factor_comp
-from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
-from data_wrangling import specific_utils
-import pandas as pd
-import numpy as np
-import pandas as pd
-import os
 import contextlib
 import logging
+import os
+
+import numpy as np
+import pandas as pd
+from data_wrangling import specific_utils
+from planning_analysis.plan_factors import (build_factor_comp,
+                                            monkey_plan_factors_x_sess_class,
+                                            test_vs_control_utils)
+from planning_analysis.show_planning import show_planning_utils
+from scipy import stats
 
 
 def make_regrouped_info(test_df,

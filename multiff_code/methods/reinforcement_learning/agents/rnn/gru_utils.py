@@ -1,14 +1,15 @@
-from reinforcement_learning.agents.rnn import lstm_utils
-import torch
-import numpy as np
-import torch.nn.functional as F
 import random
-import matplotlib.pyplot as plt
-import torch.nn as nn
-import torch.optim as optim
-from torch.distributions import Normal
 from typing import Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from reinforcement_learning.agents.rnn import lstm_utils
 from reinforcement_learning.base_classes import run_logger
+from torch.distributions import Normal
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else (
     "mps" if torch.backends.mps.is_available() else "cpu"))

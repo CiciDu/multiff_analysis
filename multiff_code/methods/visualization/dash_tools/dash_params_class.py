@@ -1,9 +1,10 @@
-from planning_analysis.test_params_for_planning import params_utils, params_test_combos_class
-from visualization.dash_tools import dash_utils
-from dash import Dash, html, Input, Output, ctx, dcc
-from dash.exceptions import PreventUpdate
-import pandas as pd
 import numpy as np
+import pandas as pd
+from dash import Dash, Input, Output, ctx, dcc, html
+from dash.exceptions import PreventUpdate
+from planning_analysis.test_params_for_planning import (
+    params_test_combos_class, params_utils)
+from visualization.dash_tools import dash_utils
 
 
 class ParamsDash(params_test_combos_class.ParamsTestCombos):

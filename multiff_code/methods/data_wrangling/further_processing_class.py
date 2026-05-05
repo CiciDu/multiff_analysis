@@ -1,39 +1,26 @@
-from data_wrangling import base_processing_class, general_utils
-from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
-from visualization.matplotlib_tools import plot_behaviors_utils
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
-from decision_making_analysis.event_detection import get_miss_to_switch_data
-from pattern_discovery import pattern_by_points
-from null_behaviors import find_best_arc, curvature_utils, curv_of_traj_utils, opt_arc_utils
-from decision_making_analysis.ff_data_acquisition import ff_data_utils
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
-from decision_making_analysis.event_detection import assign_attempts
-
 import math
-import numpy as np
-
-
-import os
-import os
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from os.path import exists
-
-
 import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
 from os.path import exists
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import base_processing_class, general_utils
+from decision_making_analysis.event_detection import (assign_attempts,
+                                                      detect_rsw_and_rcap,
+                                                      get_miss_to_switch_data)
+from decision_making_analysis.ff_data_acquisition import ff_data_utils
+from matplotlib import rc
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
+    prep_monkey_data, prep_target_data)
+from null_behaviors import (curv_of_traj_utils, curvature_utils, find_best_arc,
+                            opt_arc_utils)
+from pattern_discovery import (monkey_landing_in_ff,
+                               organize_patterns_and_features,
+                               pattern_by_points, pattern_by_trials)
+from visualization.matplotlib_tools import plot_behaviors_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

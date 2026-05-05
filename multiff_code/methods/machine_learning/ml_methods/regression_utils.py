@@ -1,21 +1,20 @@
-from machine_learning.ml_methods import ml_methods_utils
-import pandas as pd
-import torch
-import torch.optim as optim
-import torch.nn as nn
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from machine_learning.ml_methods import ml_methods_utils
+from scipy.stats import pearsonr
+from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor,
+                              GradientBoostingRegressor, RandomForestRegressor)
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import (make_scorer, mean_absolute_error,
+                             mean_squared_error, r2_score)
+from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
-from sklearn.metrics import r2_score
-from sklearn.metrics import make_scorer
-from sklearn.model_selection import cross_val_score
-import statsmodels.api as sm
-from scipy.stats import pearsonr
-from sklearn.model_selection import cross_validate
 
 
 def use_linear_regression(X_train, X_test, y_train, y_test,

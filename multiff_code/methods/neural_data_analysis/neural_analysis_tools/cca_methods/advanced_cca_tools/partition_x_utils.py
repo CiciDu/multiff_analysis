@@ -1,5 +1,5 @@
 import re
-from typing import Iterable, List, Optional, Sequence, Tuple, Union, Dict
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd

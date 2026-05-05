@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
-from pandas.api import types as pdt
 import statsmodels.api as sm
-
-
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import get_stops_utils
 from neural_data_analysis.design_kits.design_around_event import event_binning
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import \
+    get_stops_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import (
+    core_stops_psth, psth_postprocessing, psth_stats)
+from pandas.api import types as pdt
+
 
 def _detect_binary_columns_np(V: np.ndarray, *, tol_decimals: int = 12) -> np.ndarray:
     """

@@ -17,21 +17,22 @@ Example:
 """
 
 from __future__ import annotations
-import json
-import seaborn as sns
-import ast
 
 import argparse
+import ast
+import json
 import sys
 from pathlib import Path
 from typing import List, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import plot_decoding
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
+import seaborn as sns
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import \
+    plot_decoding
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import \
+    pn_aligned_by_event
 
 
 def _ensure_methods_on_path() -> None:

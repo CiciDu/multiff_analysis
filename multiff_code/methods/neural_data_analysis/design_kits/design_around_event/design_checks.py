@@ -1,10 +1,10 @@
+import json
+import os
+
 import numpy as np
 import pandas as pd
 from numpy.linalg import svd
 from statsmodels.tools.tools import add_constant
-
-import json
-import os
 
 # ============================================================
 # Utilities

@@ -17,6 +17,7 @@ You can swap in your own kernels later by replacing the temporal-kernel smooths 
 convolution regressors, but this should get you very close in practice.
 """
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -28,14 +29,13 @@ if str(PGAM_PATH) not in sys.path:
     sys.path.append(str(PGAM_PATH))
     
 
-from PGAM.GAM_library import *
-
-import PGAM.gam_data_handlers as gdh
-import numpy as np
-
 import os
 import sys
 from pathlib import Path
+
+import numpy as np
+import PGAM.gam_data_handlers as gdh
+from PGAM.GAM_library import *
 
 
 def find_project_root(marker="multiff_analysis"):

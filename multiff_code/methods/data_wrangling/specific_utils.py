@@ -1,9 +1,11 @@
-import os
-import numpy as np
-from math import pi
 import math
-import pandas as pd
+import os
 import re
+from math import pi
+
+import numpy as np
+import pandas as pd
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
@@ -111,21 +113,29 @@ def calculate_angles_to_ff_boundaries(angles_to_ff, distances_to_ff, ff_radius=1
     return angles_to_boundaries
 
 
-def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_boundaries, ff_real_position_sorted, monkey_x_array,
-                                     monkey_y_array, monkey_angles_array, in_memory_indices):
+def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_boundaries, ff_real_position_sorted, monkey_information, point_indices):
     # To also calculate delta_angles_to_ff and delta_angles_to_boundaries:
-    prev_monkey_xy_relevant = np.stack(
-        [monkey_x_array[in_memory_indices-1], monkey_y_array[in_memory_indices-1]], axis=1)
+    point_indices = np.asarray(point_indices)
+    delta_abs_angles_to_ff = np.zeros(len(point_indices), dtype=float)
+    delta_abs_angles_to_boundary = np.zeros(len(point_indices), dtype=float)
+    valid_mask = point_indices > 0
+    if not np.any(valid_mask):
+        return delta_abs_angles_to_ff, delta_abs_angles_to_boundary
+
+    valid_point_indices = point_indices[valid_mask]
+    prev_monkey_xy_relevant = monkey_information.loc[valid_point_indices-1, ['monkey_x', 'monkey_y']].values
+
     prev_ff_distance_relevant = np.linalg.norm(
-        prev_monkey_xy_relevant-ff_real_position_sorted[current_ff_index], axis=1)
-    prev_monkey_angles_relevant = monkey_angles_array[in_memory_indices-1]
-    prev_angles_to_ff = calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[current_ff_index, 0], ff_y=ff_real_position_sorted[
-                                                       current_ff_index, 1], mx=prev_monkey_xy_relevant[:, 0], my=prev_monkey_xy_relevant[:, 1], m_angle=prev_monkey_angles_relevant)
+        prev_monkey_xy_relevant-ff_real_position_sorted[current_ff_index[valid_mask]], axis=1)
+    prev_monkey_angles_relevant = monkey_information.loc[valid_point_indices-1, 'monkey_angle'].values
+    prev_angles_to_ff = calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[current_ff_index[valid_mask], 0], ff_y=ff_real_position_sorted[
+                                                       current_ff_index[valid_mask], 1], mx=prev_monkey_xy_relevant[:, 0], my=prev_monkey_xy_relevant[:, 1], m_angle=prev_monkey_angles_relevant)
     prev_angles_to_boundaries = calculate_angles_to_ff_boundaries(
         angles_to_ff=prev_angles_to_ff, distances_to_ff=prev_ff_distance_relevant)
-    delta_abs_angles_to_ff = np.abs(angles_to_ff) - np.abs(prev_angles_to_ff)
-    delta_abs_angles_to_boundary = np.abs(
-        angles_to_boundaries) - np.abs(prev_angles_to_boundaries)
+    delta_abs_angles_to_ff[valid_mask] = np.abs(
+        angles_to_ff[valid_mask]) - np.abs(prev_angles_to_ff)
+    delta_abs_angles_to_boundary[valid_mask] = np.abs(
+        angles_to_boundaries[valid_mask]) - np.abs(prev_angles_to_boundaries)
     return delta_abs_angles_to_ff, delta_abs_angles_to_boundary
 
 

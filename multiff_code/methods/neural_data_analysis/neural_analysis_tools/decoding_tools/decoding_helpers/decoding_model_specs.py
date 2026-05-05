@@ -1,13 +1,6 @@
-from sklearn.linear_model import (
-    LinearRegression,
-    Ridge,
-    Lasso,
-    ElasticNet,
-    LogisticRegression,
-    HuberRegressor,
-)
-from catboost import CatBoostRegressor, CatBoostClassifier
-
+from catboost import CatBoostClassifier, CatBoostRegressor
+from sklearn.linear_model import (ElasticNet, HuberRegressor, Lasso,
+                                  LinearRegression, LogisticRegression, Ridge)
 
 MODEL_SPECS = {
 

@@ -1,21 +1,16 @@
-from dataclasses import dataclass, field
-from typing import Dict, Sequence, Optional, Tuple, List, Mapping
-
 import warnings
-from neural_data_analysis.design_kits.design_by_segment import other_feats
-import numpy as np
-import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
+from dataclasses import dataclass, field
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy.linalg import qr
-
-
+from neural_data_analysis.design_kits.design_by_segment import (other_feats,
+                                                                temporal_feats)
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+from scipy import signal
+from scipy.interpolate import BSpline
+from scipy.linalg import qr
 
 
 def check_design_vs_bases(

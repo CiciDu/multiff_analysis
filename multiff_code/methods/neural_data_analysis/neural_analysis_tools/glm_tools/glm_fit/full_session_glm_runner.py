@@ -1,54 +1,31 @@
 # =========================
 # Standard library
 # =========================
-import os
-import math
 import json
+import math
+import os
 
 # =========================
 # Third-party
 # =========================
 import numpy as np
 import pandas as pd
-
+from decision_making_analysis.data_compilation import miss_events_class
+from neural_data_analysis.design_kits.design_around_event import event_binning
+from neural_data_analysis.design_kits.design_by_segment import (
+    create_pn_design_df, rebin_segments, temporal_feats)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encode_stops_utils
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import \
+    glm_runner
+from neural_data_analysis.topic_based_neural_analysis.full_session import (
+    create_best_arc_design, create_full_session_design, select_fs_features,
+    selected_pn_design_features, selected_stop_design_features)
 # =========================
 # MultiFF imports (USED ONLY)
 # =========================
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
-    pn_utils,
-    pn_aligned_by_event,
-)
-
-from neural_data_analysis.design_kits.design_by_segment import (
-    rebin_segments,
-    temporal_feats,
-    create_pn_design_df,
-)
-
-from neural_data_analysis.topic_based_neural_analysis.full_session import (
-    create_full_session_design,
-    selected_pn_design_features,
-    selected_stop_design_features,
-    create_best_arc_design,
-    select_fs_features,
-)
-
-from neural_data_analysis.design_kits.design_around_event import (
-    event_binning,
-)
-
-
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import (
-    glm_runner,
-)
-
-from decision_making_analysis.data_compilation import (
-    miss_events_class,
-)
-
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_utils,
-)
+    pn_aligned_by_event, pn_utils)
 
 
 class FullSessionGLMRunner:

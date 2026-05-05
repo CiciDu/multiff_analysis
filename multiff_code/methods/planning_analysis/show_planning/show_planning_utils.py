@@ -1,13 +1,14 @@
 
-from data_wrangling import specific_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
-from planning_analysis.plan_factors import build_factor_comp
-
-import statsmodels.api as sm
-import pandas as pd
-import numpy as np
 import math
 import os
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from data_wrangling import specific_utils
+from planning_analysis.plan_factors import build_factor_comp
+from planning_analysis.show_planning.cur_vs_nxt_ff import (find_cvn_utils,
+                                                           plot_cvn_utils)
 
 
 def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_arc_angle=False):

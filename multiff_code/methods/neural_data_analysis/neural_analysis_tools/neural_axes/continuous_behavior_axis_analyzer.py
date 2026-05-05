@@ -1,25 +1,14 @@
 import numpy as np
 import pandas as pd
-
 from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
-    build_continuous_fr,
-    events_to_bins,
-    extract_event_windows,
-    fit_behavior_axis,
-    cross_validate_axis,
-    orthogonalize_axes,
-    axis_angle
-)
+    axis_angle, build_continuous_fr, cross_validate_axis, events_to_bins,
+    extract_event_windows, fit_behavior_axis, orthogonalize_axes)
 
-from .axis_visualization import (
-    plot_projection,
-    plot_event_projection_scatter,
-    plot_event_projection_hist,
-    plot_projection_with_events,
-    plot_event_aligned_projection,
-    diagnose_axis,
-    plot_3d_projection
-)
+from .axis_visualization import (diagnose_axis, plot_3d_projection,
+                                 plot_event_aligned_projection,
+                                 plot_event_projection_hist,
+                                 plot_event_projection_scatter,
+                                 plot_projection, plot_projection_with_events)
 
 
 class ContinuousBehaviorAxisAnalyzer:
@@ -65,7 +54,8 @@ class ContinuousBehaviorAxisAnalyzer:
                 self.clusters = external_clusters
         else:
             # original path: build continuous FR from spikes
-            from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import build_continuous_fr
+            from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import \
+                build_continuous_fr
             self.fr_mat, self.start_time = build_continuous_fr(
                 spike_times, spike_codes, len(clusters),
                 bin_width_ms, smoothing_sigma_ms

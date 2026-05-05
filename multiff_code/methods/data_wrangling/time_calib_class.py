@@ -1,13 +1,12 @@
-from data_wrangling import further_processing_class, retrieve_raw_data, time_calib_utils
-
-import os
 import os
 import os.path
-import pandas as pd
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from data_wrangling import (further_processing_class, retrieve_raw_data,
+                            time_calib_utils)
 
 
 class TimeCalibration(further_processing_class.FurtherProcessing):

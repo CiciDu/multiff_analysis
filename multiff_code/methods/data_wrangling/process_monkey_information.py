@@ -1,16 +1,16 @@
-from data_wrangling import time_calib_utils, retrieve_raw_data, general_utils
-
-import os
 import math
-from math import pi
+import os
 import os.path
-import pandas as pd
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
+from math import pi
 from os.path import exists
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import general_utils, retrieve_raw_data, time_calib_utils
 from eye_position_analysis import eye_positions
+from matplotlib import rc
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

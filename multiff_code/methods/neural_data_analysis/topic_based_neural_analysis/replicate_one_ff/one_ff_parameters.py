@@ -10,7 +10,6 @@ from typing import Dict, List
 
 import numpy as np
 
-
 plot_var_order = [
     # egocentric / motion state
     'f_v',

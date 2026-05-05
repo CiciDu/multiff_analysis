@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Run retry-related analysis for one SB3 agent folder."""
+import argparse
 import os
 import sys
 from pathlib import Path
-
-import argparse
 
 # ---------------------------------------------------------------------
 # Locate project root
@@ -18,8 +17,8 @@ else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
 def main():
-    from reinforcement_learning.agents.feedforward import sb3_class
     from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+    from reinforcement_learning.agents.feedforward import sb3_class
     from reinforcement_learning.collect_data import agent_patterns_class
 
     parser = argparse.ArgumentParser(description='Run agent retry analysis')

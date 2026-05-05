@@ -1,8 +1,8 @@
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from reinforcement_learning.base_classes.base_env import MultiFF
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 
 class WrapperForRecurrentPPO(gym.Wrapper):

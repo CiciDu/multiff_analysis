@@ -1,7 +1,9 @@
 
 import os
+
 import numpy as np
 import pandas as pd
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)

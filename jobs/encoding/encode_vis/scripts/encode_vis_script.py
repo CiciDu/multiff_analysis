@@ -1,7 +1,6 @@
+import os
 import sys
 from pathlib import Path
-import os
-
 
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == "Multifirefly-Project":
@@ -11,18 +10,16 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         break
 
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoding_design_utils,
-)
 from jobs.encoding.shared_encoding_script import run_encoding_main
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
 
 
 def main():
     encoding_design_utils.bootstrap_repo_path()
 
-    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
-        encoding_tasks,
-    )
+    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import \
+        encoding_tasks
 
     return run_encoding_main(
         encoding_tasks.VisEncodingTask,

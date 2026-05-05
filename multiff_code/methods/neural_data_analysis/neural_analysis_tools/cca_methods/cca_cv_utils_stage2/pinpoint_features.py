@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-from sklearn.model_selection import GroupKFold, KFold
+import pandas as pd
 import rcca
+from sklearn.model_selection import GroupKFold, KFold
 
 
 def cv_cca_perm_importance(
@@ -26,8 +26,8 @@ def cv_cca_perm_importance(
     """
     import numpy as np
     import pandas as pd
-    from sklearn.model_selection import GroupKFold, KFold
     import rcca
+    from sklearn.model_selection import GroupKFold, KFold
 
     rng = np.random.default_rng(random_state)
     n, p = X1.shape
@@ -202,10 +202,11 @@ def cv_cca_leave1out_delta(
       - pct_drop_firstK: mean of pct_drop_comp{1..K}
     """
     import os
+
     import numpy as np
     import pandas as pd
-    from sklearn.model_selection import GroupKFold, KFold
     import rcca
+    from sklearn.model_selection import GroupKFold, KFold
 
     # joblib (optional)
     try:
@@ -367,8 +368,8 @@ def cv_structure_coefficients(X1_all, X2, feature_names, *,
                               random_state=0, groups=None):
     import numpy as np
     import pandas as pd
-    from sklearn.model_selection import GroupKFold, KFold
     import rcca
+    from sklearn.model_selection import GroupKFold, KFold
 
     n, p = X1_all.shape
     if groups is not None and len(np.unique(groups)) >= n_splits:

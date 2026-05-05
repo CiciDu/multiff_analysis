@@ -1,9 +1,8 @@
-from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plot_cv
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-
-
+from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import \
+    cca_plot_cv
 
 
 def plot_cca_lag_vs_nolag_and_train_vs_test(

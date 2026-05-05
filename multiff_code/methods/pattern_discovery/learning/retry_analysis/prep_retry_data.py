@@ -1,19 +1,17 @@
 
-from scipy import stats
-from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from data_wrangling import specific_utils, process_monkey_information, base_processing_class, combine_info_utils, further_processing_class
-from decision_making_analysis.data_compilation import miss_events_class
-
-import numpy as np
-import pandas as pd
 import os
 
 import numpy as np
 import pandas as pd
-
-import numpy as np
-import pandas as pd
+from data_wrangling import (base_processing_class, combine_info_utils,
+                            further_processing_class,
+                            process_monkey_information, specific_utils)
+from decision_making_analysis.data_compilation import miss_events_class
+from planning_analysis.factors_vs_indicators import (make_variations_utils,
+                                                     process_variations_utils)
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_class, plot_variations_utils)
+from scipy import stats
 
 
 def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno',

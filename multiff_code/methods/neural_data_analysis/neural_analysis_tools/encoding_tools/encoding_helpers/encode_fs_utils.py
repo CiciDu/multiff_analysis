@@ -2,12 +2,13 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decode_fs_utils
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import decode_stops_design
 from neural_data_analysis.design_kits.design_by_segment import other_feats
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
+    decode_fs_utils, decoding_design_utils)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    encoding_design_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import \
+    decode_stops_design
 
 
 def build_fs_encoding_design(
@@ -31,9 +32,8 @@ def build_fs_encoding_design(
     the decoding task uses), then applying scale_binned_feats +
     clean_binary_and_drop_constant.
     """
-    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers.encoder_gam_helper import (
-        FS_ENCODING_VAR_CATEGORIES,
-    )
+    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers.encoder_gam_helper import \
+        FS_ENCODING_VAR_CATEGORIES
     var_categories = FS_ENCODING_VAR_CATEGORIES
 
     # ── shared decoding design ──────────────────────────────────────────

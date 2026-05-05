@@ -1,12 +1,9 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
-
-from sklearn.decomposition import PCA
 
 plt.rcParams.update({'font.size': 10})
 
@@ -388,6 +385,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
+
 def visualize_detrend_single_feature(x, t, degree=1, feature_name='feature'):
     '''
     x : (n_samples,) feature values (e.g., firing rate of one neuron)
@@ -456,8 +454,9 @@ def variance_removed_by_detrending(X, X_dt):
     return frac_removed
 
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+
 
 def plot_population_mean_smoothed(X, t, window=60):
     '''
@@ -541,8 +540,8 @@ def print_drift_summary(drift_df, hz_threshold=2.0):
             [['slope_hz_per_s', 'delta_hz_session', 'r']]
         )
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 

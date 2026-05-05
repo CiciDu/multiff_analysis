@@ -1,19 +1,18 @@
 
-import numpy as np
-from sklearn.model_selection import KFold
-import matplotlib.pyplot as plt
-import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
 import pickle
-from pathlib import Path
-from typing import Optional, Dict
 from dataclasses import asdict
+from pathlib import Path
+from typing import Dict, Optional
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import \
+    _build_folds
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import \
+    one_ff_gam_fit
 from scipy.signal import convolve
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import one_ff_gam_fit
-
+from sklearn.model_selection import KFold
 
 # ------------------------------------------------------------------
 # Gaussian smoothing kernel (MATLAB equivalent)

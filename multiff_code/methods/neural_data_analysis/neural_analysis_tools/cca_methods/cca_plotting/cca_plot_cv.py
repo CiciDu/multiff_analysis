@@ -1,11 +1,7 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import math
 
-
-
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_cca_cv_results(

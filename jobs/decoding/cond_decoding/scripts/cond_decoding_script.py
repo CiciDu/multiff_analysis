@@ -1,14 +1,16 @@
-from pathlib import Path
-import sys
-import os
-import json
 import argparse
+import hashlib
+import json
+import os
+import sys
+import traceback
 from datetime import datetime
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import traceback
-import hashlib
+
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == 'Multifirefly-Project':
         os.chdir(p)

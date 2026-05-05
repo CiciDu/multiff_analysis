@@ -1,13 +1,13 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, r2_score, mean_squared_error
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.svm import SVC, SVR
-from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
-import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC, SVR
 
 
 class MLBehavioralDecoder:

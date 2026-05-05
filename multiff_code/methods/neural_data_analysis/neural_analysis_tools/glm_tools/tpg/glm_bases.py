@@ -41,8 +41,9 @@ def _unique_trials(trial_ids: np.ndarray) -> np.ndarray:
     return np.unique(np.asarray(trial_ids))
 
 
+from typing import Optional, Tuple
+
 import numpy as np
-from typing import Tuple, Optional
 from scipy.interpolate import BSpline
 
 
@@ -114,10 +115,10 @@ def raised_cosine_basis(
     return lags, B
 
 
-import numpy as np
 from typing import Tuple
 
 import numpy as np
+
 
 def raised_log_cosine_basis(
     n_basis: int,

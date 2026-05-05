@@ -1,28 +1,24 @@
 
-import warnings
-from typing import Dict, List, Optional, Tuple, Union, Any
+import os
 import re
+import sys
+import warnings
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
-
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_glm_design
-from neural_data_analysis.design_kits.design_around_event import event_binning
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    GroupSpec,
-)
-
-
-import os
-import sys
-from pathlib import Path
 from data_wrangling import combine_info_utils
-
+from neural_data_analysis.design_kits.design_around_event import event_binning
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import \
+    decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+    multiff_encoding_params
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import \
+    one_ff_glm_design
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import \
+    GroupSpec
 
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
 _RAD_TO_DEG = 180.0 / np.pi
@@ -758,9 +754,7 @@ def build_vis_encoding_design(
     temporal designs.
     """
     from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-        encode_stops_utils,
-        encode_vis_utils,
-    )
+        encode_stops_utils, encode_vis_utils)
 
     (
         pn,

@@ -1,7 +1,7 @@
+from data_wrangling import further_processing_class
 from planning_analysis.plan_factors import plan_factors_class
 from reinforcement_learning.agents.feedforward import sb3_class
 from reinforcement_learning.base_classes import rl_base_class
-from data_wrangling import further_processing_class
 
 
 class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):

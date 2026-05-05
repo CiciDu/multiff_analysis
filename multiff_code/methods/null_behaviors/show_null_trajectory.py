@@ -1,21 +1,22 @@
 
-from matplotlib import cm
 import math
-import pandas as pd
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
-from visualization.animation import animation_utils
-from null_behaviors import find_best_arc, curvature_utils, opt_arc_utils
-from pattern_discovery import ff_dataframe_utils
-
+import numbers
 import os
 import warnings
-import numpy as np
-import numbers
-from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
-import matplotlib
 from math import pi
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from data_wrangling import specific_utils
+from matplotlib import cm
+from matplotlib.lines import Line2D
+from null_behaviors import curvature_utils, find_best_arc, opt_arc_utils
+from pattern_discovery import ff_dataframe_utils
+from visualization.animation import animation_utils
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

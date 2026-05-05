@@ -1,9 +1,8 @@
-import numpy as np
-from sklearn.model_selection import GroupKFold, KFold
-from cca_zoo.linear import rCCA, CCA
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from cca_zoo.linear import CCA, rCCA
+from sklearn.model_selection import GroupKFold, KFold
 from sklearn.preprocessing import StandardScaler
 
 

@@ -1,23 +1,25 @@
-from visualization.matplotlib_tools import plot_behaviors_utils
-from data_wrangling import specific_utils
-
+import math
 import os
+
 import numpy as np
 import pandas as pd
-import math
+from data_wrangling import specific_utils
 from scipy.cluster.hierarchy import linkage
 from sklearn.cluster import AgglomerativeClustering
+from visualization.matplotlib_tools import plot_behaviors_utils
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 
+import os
+
 import numpy as np
 import pandas as pd
-import os
-from scipy.spatial.distance import pdist, squareform
 from scipy.sparse.csgraph import connected_components
+from scipy.spatial.distance import pdist, squareform
 
 
 def make_point_vs_cluster(

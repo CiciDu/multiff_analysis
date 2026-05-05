@@ -1,17 +1,15 @@
-from data_wrangling import time_calib_utils
-from reinforcement_learning.base_classes import env_utils
-
-import os
-import re
 import os
 import os.path
-import neo
-import pandas as pd
-import numpy as np
+import re
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import neo
+import numpy as np
 import pandas as pd
+from data_wrangling import time_calib_utils
+from matplotlib import rc
+from reinforcement_learning.base_classes import env_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

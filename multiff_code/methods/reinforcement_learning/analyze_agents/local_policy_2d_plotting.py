@@ -1,13 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
-
-from reinforcement_learning.analyze_agents import analyze_policy_smoothness
-from reinforcement_learning.analyze_agents import local_policy_2d_core
+import numpy as np
+from reinforcement_learning.analyze_agents import (analyze_policy_smoothness,
+                                                   local_policy_2d_core)
 from reinforcement_learning.analyze_agents.local_policy_2d_core import (
-    _choose_anchor_indices,
-    _get_value_col_from_value_type,
-    evaluate_policy_local_2d_sweeps,
-)
+    _choose_anchor_indices, _get_value_col_from_value_type,
+    evaluate_policy_local_2d_sweeps)
 
 
 def _select_anchor_plot_df(sweep_2d_df, average_across_anchors=False, anchor_id=None):
@@ -526,8 +523,8 @@ def _format_pair_label(x_label, y_label):
     return f'{x_label} vs {y_label}'
 
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import TwoSlopeNorm
 
 
@@ -551,10 +548,10 @@ def _format_pair_label(x_label, y_label):
 
     return f'{x_label} vs {y_label}'
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import TwoSlopeNorm
-from matplotlib.ticker import MaxNLocator, FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 
 
 def _format_pair_label(x_label, y_label):

@@ -538,9 +538,9 @@ def lm_spike_counts_for_columns(
 
     # ── optional design-matrix reduction ──────────────────────────────────
     if reduce_design:
-        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-            process_encode_design,
-        )
+        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+            process_encode_design
+
         # Protected columns are the test-variable dummies + continuous_cols:
         # these must survive regardless of what the reduction decides.
         protected: set = {c for cols in col_groups.values() for c in cols}

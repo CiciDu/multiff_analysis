@@ -1,8 +1,9 @@
-from reinforcement_learning.base_classes import base_env, more_envs, env_utils
-import gymnasium
-
 import os
+
+import gymnasium
 import numpy as np
+from reinforcement_learning.base_classes import base_env, env_utils, more_envs
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

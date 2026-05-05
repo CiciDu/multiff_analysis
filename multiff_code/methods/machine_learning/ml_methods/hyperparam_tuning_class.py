@@ -1,15 +1,15 @@
 
 
 import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import RepeatedStratifiedKFold, GridSearchCV
-from IPython.display import display
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from IPython.display import display
+from matplotlib import rc
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     RepeatedStratifiedKFold)
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

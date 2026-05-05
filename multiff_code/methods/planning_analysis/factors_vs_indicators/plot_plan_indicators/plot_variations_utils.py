@@ -1,13 +1,15 @@
-from pandas.api.types import is_string_dtype, is_integer_dtype, is_numeric_dtype
-from planning_analysis.factors_vs_indicators import process_variations_utils
-import numpy as np
-import math
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import matplotlib.pyplot as plt
-import seaborn as sns
 import copy
+import math
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
+import seaborn as sns
+from pandas.api.types import (is_integer_dtype, is_numeric_dtype,
+                              is_string_dtype)
+from planning_analysis.factors_vs_indicators import process_variations_utils
+from plotly.subplots import make_subplots
 
 
 def _check_order_in_changeable_variables(changeable_variables, original_df):

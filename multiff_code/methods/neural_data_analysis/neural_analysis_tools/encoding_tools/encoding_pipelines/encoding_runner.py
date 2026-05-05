@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from .encoding_models import PGAMModel, BaseEncodingModel
 from .base_encoding_task import BaseEncodingTask
+from .encoding_models import BaseEncodingModel, PGAMModel
 
 
 class EncodingRunner:
@@ -184,7 +184,8 @@ class EncodingRunner:
         )
         
     def get_gam_groups(self):
-        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
+            encoding_design_utils
         return encoding_design_utils.build_gam_groups_from_meta(
             self.task.structured_meta_groups,
             lam_f=self.model.lambda_config['lam_f'],

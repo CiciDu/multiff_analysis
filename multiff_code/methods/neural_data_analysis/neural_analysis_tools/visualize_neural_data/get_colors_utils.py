@@ -1,12 +1,9 @@
-import re
 import colorsys
-import plotly.colors as pc
-
-
 import hashlib
+import re
+
+import plotly.colors as pc
 from plotly.colors import qualitative as qual
-
-
 
 try:
     # nice-to-have: resolves CSS names to RGB

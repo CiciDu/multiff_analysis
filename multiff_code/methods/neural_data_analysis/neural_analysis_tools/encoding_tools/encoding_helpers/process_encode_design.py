@@ -1,8 +1,10 @@
 
 import numpy as np
+from neural_data_analysis.neural_analysis_tools.model_neural_data import (
+    drop_high_corr_vars, drop_high_vif_vars)
+from neural_data_analysis.topic_based_neural_analysis.target_decoder import \
+    prep_target_decoder
 
-from neural_data_analysis.topic_based_neural_analysis.target_decoder import prep_target_decoder
-from neural_data_analysis.neural_analysis_tools.model_neural_data import drop_high_corr_vars, drop_high_vif_vars
 
 def get_strong_correlations(design_df, threshold=0.9):
     # Keep only numeric columns

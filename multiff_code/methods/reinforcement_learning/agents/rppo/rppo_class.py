@@ -1,12 +1,15 @@
-import os
 import json
-from reinforcement_learning.base_classes import rl_base_class, rl_base_utils, env_utils, base_env
-from reinforcement_learning.agents.rppo import rppo_env
+import os
+
 from reinforcement_learning.agents.feedforward import sb3_utils
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
-from stable_baselines3.common.vec_env import VecMonitor
+from reinforcement_learning.agents.rppo import rppo_env
+from reinforcement_learning.base_classes import (base_env, env_utils,
+                                                 rl_base_class, rl_base_utils)
 from sb3_contrib import RecurrentPPO
 from sb3_contrib.ppo_recurrent import MultiInputLstmPolicy
+from stable_baselines3.common.callbacks import (EvalCallback,
+                                                StopTrainingOnRewardThreshold)
+from stable_baselines3.common.vec_env import VecMonitor
 
 
 class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):

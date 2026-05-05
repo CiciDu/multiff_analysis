@@ -4,21 +4,17 @@
 
 import hashlib
 import json
+import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Type, Union
 
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRegressor, CatBoostError
-import pickle
+from catboost import CatBoostError, CatBoostRegressor
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    average_precision_score,
-    mean_squared_error,
-    r2_score,
-    roc_auc_score
-)
+from sklearn.metrics import (average_precision_score, mean_squared_error,
+                             r2_score, roc_auc_score)
 from sklearn.model_selection import GroupKFold, KFold
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
@@ -329,9 +325,8 @@ def _maybe_detrend_neural(
     """
     if detrend_cov_tr is None or detrend_cov_te is None:
         return X_tr.copy(), X_te.copy()
-    from neural_data_analysis.neural_analysis_tools.get_neural_data.neural_drift import (
-        detrend_features_cv_covariates,
-    )
+    from neural_data_analysis.neural_analysis_tools.get_neural_data.neural_drift import \
+        detrend_features_cv_covariates
     T_tr = _build_detrend_design_matrix(detrend_cov_tr, degree=degree)
     T_te = _build_detrend_design_matrix(detrend_cov_te, degree=degree)
 

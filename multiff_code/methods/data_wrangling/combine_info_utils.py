@@ -1,10 +1,10 @@
-from decision_making_analysis.ff_data_acquisition import get_missed_ff_data
-from data_wrangling import specific_utils
-
+import gc
 import os
 from os.path import exists
+
 import pandas as pd
-import gc
+from data_wrangling import specific_utils
+from decision_making_analysis.ff_data_acquisition import get_missed_ff_data
 
 
 def make_sessions_df_for_one_monkey(raw_data_dir_name, monkey_name):

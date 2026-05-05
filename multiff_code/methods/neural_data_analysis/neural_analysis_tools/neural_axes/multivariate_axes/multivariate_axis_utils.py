@@ -1,8 +1,8 @@
 # multivariate_axis_utils.py
 import numpy as np
-from sklearn.model_selection import KFold
 from numpy.linalg import svd
-from sklearn.linear_model import Ridge, MultiTaskElasticNet
+from sklearn.linear_model import MultiTaskElasticNet, Ridge
+from sklearn.model_selection import KFold
 
 
 def fit_multitask_linear(X, Y, method='ridge', alpha=1.0, l1_ratio=0.5):
@@ -87,8 +87,8 @@ def cross_validated_r2(X, Y, W, n_splits=5):
 
     return np.mean(r2s)
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # noqa
 
 
