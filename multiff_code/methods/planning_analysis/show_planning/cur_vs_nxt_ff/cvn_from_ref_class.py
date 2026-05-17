@@ -12,6 +12,54 @@ from planning_analysis.show_planning.cur_vs_nxt_ff import (cvn_helper_class,
                                                            plot_cvn_class)
 from visualization.matplotlib_tools import monkey_heading_utils
 
+# Columns dropped from heading_info_df when slim_save=True (agent sessions).
+# Keeps only the columns needed to compute the three primary metrics
+# (diff_in_angle_to_nxt_ff, diff_in_abs_angle_to_nxt_ff, diff_in_abs_d_curv,
+# dir_from_cur_ff_same_side) plus filtering columns.
+_HEADING_INFO_SLIM_DROP_COLS = [
+    # coordinates — angles already computed and stored
+    'stop_x', 'stop_y',
+    'cur_ff_x', 'cur_ff_y',
+    'nxt_ff_x', 'nxt_ff_y',
+    'mx_before_stop', 'my_before_stop',
+    # nxt arc geometry — nothing downstream reads these for agents
+    'nxt_cntr_arc_d_heading', 'nxt_cntr_arc_end_heading', 'nxt_cntr_arc_curv',
+    'nxt_cntr_arc_end_x', 'nxt_cntr_arc_end_y',
+    'nxt_opt_arc_d_heading', 'nxt_opt_arc_end_heading', 'nxt_opt_arc_curv',
+    'nxt_opt_arc_end_x', 'nxt_opt_arc_end_y',
+    # cur cntr arc — agents always use use_curv_to_ff_center=False
+    'cur_cntr_arc_d_heading', 'cur_cntr_arc_end_heading', 'cur_cntr_arc_curv',
+    'cur_cntr_arc_end_x', 'cur_cntr_arc_end_y',
+    # timing / index columns only used in the monkey plan-features path
+    'stop_time', 'next_stop_time', 'next_stop_point_index',
+    'CUR_time_ff_first_seen_bbas', 'CUR_time_ff_last_seen_bbas',
+    # bbas flash/seen columns — dropped even in monkey path by drop_columns_that_contain_both_nxt_and_bbas
+    'nxt_ff_last_flash_time_bbas',
+    'nxt_ff_cluster_last_seen_time_bbas', 'nxt_ff_cluster_last_flash_time_bbas',
+    # columns only needed for monkey plan_features1 construction
+    'cur_ff_index', 'point_index_before_stop', 'monkey_angle_before_stop',
+    # intermediate or unused derived columns
+    'angle_from_m_before_stop_to_cur_ff',
+    'angle_cntr_cur_end_to_nxt_ff',
+    'ratio_of_angle_to_nxt_ff', 'diff_in_d_heading_to_cur_ff',
+    'ref_monkey_angle', 'ref_curv_of_traj',
+    'cur_valid_null_arc', 'nxt_valid_null_arc',
+    'curv_iqr',
+    # from add_both_ff_at_ref — only nxt_ff_angle_at_ref is used for range filtering
+    'cur_ff_distance_at_ref', 'cur_ff_angle_at_ref', 'cur_ff_angle_boundary_at_ref',
+    'nxt_ff_distance_at_ref', 'nxt_ff_angle_boundary_at_ref',
+]
+
+# Columns dropped from diff_in_curv_df when slim_save=True.
+# Keeps only diff_in_abs_d_curv (primary metric) plus the merge keys.
+_DIFF_IN_CURV_SLIM_DROP_COLS = [
+    'traj_curv_to_stop', 'curv_from_stop_to_nxt_ff',
+    'opt_curv_to_cur_ff', 'curv_from_cur_end_to_nxt_ff',
+    'd_curv_null_arc', 'd_curv_monkey',
+    'abs_d_curv_null_arc', 'abs_d_curv_monkey',
+    'diff_in_d_curv',
+]
+
 
 class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._PlotCurVsNxtFF):
 
@@ -110,7 +158,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                   save_data=True,
                                                   merge_diff_in_curv_df_to_heading_info=True,
                                                   deal_with_rows_with_big_ff_angles=True,
-                                                  remove_i_o_modify_rows_with_big_ff_angles=True):
+                                                  remove_i_o_modify_rows_with_big_ff_angles=True,
+                                                  slim_save=False):
 
         self.ref_point_params = {
             'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value}
@@ -133,7 +182,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
-                                                                                           merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+                                                                                           merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info,
+                                                                                           slim_save=slim_save)
 
     def add_info_to_nxt_ff_and_cur_ff_df(self, deal_with_rows_with_big_ff_angles=True,
                                          remove_i_o_modify_rows_with_big_ff_angles=True):
@@ -150,7 +200,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def make_or_retrieve_diff_in_curv_df(self, ref_point_mode, ref_point_value, test_or_control, curv_traj_window_before_stop=[-25, 0], exists_ok=True, save_data=True,
                                          merge_diff_in_curv_df_to_heading_info=True,
-                                         only_try_retrieving=False):
+                                         only_try_retrieving=False, slim_save=False):
         folder_path = os.path.join(
             self.planning_data_folder_path, self.diff_in_curv_partial_path, test_or_control)
         os.makedirs(folder_path, exist_ok=True)
@@ -166,7 +216,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                 self.make_diff_in_curv_df(
                     curv_traj_window_before_stop=curv_traj_window_before_stop)
                 if save_data:
-                    self.diff_in_curv_df.to_csv(df_path)
+                    df_to_save = self.diff_in_curv_df.drop(columns=_DIFF_IN_CURV_SLIM_DROP_COLS, errors='ignore') if slim_save else self.diff_in_curv_df
+                    df_to_save.to_csv(df_path)
                     print(f'Saved diff_in_curv_df in {df_path}')
             else:
                 raise FileNotFoundError(
@@ -358,7 +409,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         return self.heading_info_df, self.diff_in_curv_df
 
     def retrieve_or_make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,
-                                         merge_diff_in_curv_df_to_heading_info=True):
+                                         merge_diff_in_curv_df_to_heading_info=True, slim_save=False):
         self.heading_info_path = os.path.join(
             self.planning_data_folder_path, self.heading_info_partial_path, test_or_control)
         os.makedirs(self.heading_info_path, exist_ok=True)
@@ -383,15 +434,16 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             df_name = find_cvn_utils.get_df_name_by_ref(
                 self.monkey_name, self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'])
             if save_data:
-                self.heading_info_df.to_csv(
-                    os.path.join(self.heading_info_path, df_name))
+                df_to_save = self.heading_info_df.drop(columns=_HEADING_INFO_SLIM_DROP_COLS, errors='ignore') if slim_save else self.heading_info_df
+                df_to_save.to_csv(os.path.join(self.heading_info_path, df_name))
                 print(
                     f'Stored new heading_info_df ({df_name}) ({len(self.heading_info_df)} rows) in {os.path.join(self.heading_info_path, df_name)}')
 
             self.diff_in_curv_df = self.make_or_retrieve_diff_in_curv_df(self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'], test_or_control,
                                                                          curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                                                                          exists_ok=diff_in_curv_df_exists_ok, save_data=save_data,
-                                                                         merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+                                                                         merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info,
+                                                                         slim_save=slim_save)
 
         return self.heading_info_df, self.diff_in_curv_df
 

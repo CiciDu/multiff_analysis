@@ -13,6 +13,7 @@ from planning_analysis.factors_vs_indicators import (make_variations_utils,
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff.cvn_from_ref_class import _HEADING_INFO_SLIM_DROP_COLS
 from reinforcement_learning.agents.feedforward import sb3_class
 from reinforcement_learning.base_classes import rl_base_class, rl_base_utils
 
@@ -33,7 +34,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                  # note, currently we use 900s / dt = 9000 steps (15 mins)
                  backend='matplotlib',
                  ):
-
         super().__init__(opt_arc_type=opt_arc_type, backend=backend)
         self.model_folder_name = model_folder_name
         self.opt_arc_type = opt_arc_type
@@ -41,8 +41,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self, self.model_folder_name)
         self.monkey_name = None
 
-        self.combd_planning_info_folder_path = os.path.join(model_folder_name.replace(
-            'all_agents', 'all_collected_data/planning'), 'combined_data')
+        planning_root = model_folder_name.replace(
+            'all_agents', 'all_collected_data/planning')
+        self.combd_planning_info_folder_path = os.path.join(
+            planning_root, 'combined_data')
         self.combd_cur_and_nxt_folder_path = os.path.join(
             self.combd_planning_info_folder_path, 'cur_and_nxt')
         self.make_key_paths()
@@ -64,11 +66,13 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     save_data=True,
                                     final_products_exist_ok=True,
                                     intermediate_products_exist_ok=True,
+                                    combined_heading_data_exists_ok=True,
                                     agent_data_exists_ok=True,
                                     model_folder_name=None,
                                     ref_point_params_based_on_mode=None,
                                     use_stored_data_only=False,
                                     high_level_only=False,
+                                    save_combined_data=True,
                                     **env_kwargs
                                     ):
         """
@@ -80,9 +84,37 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             without loading lower-level data (heading info per session,
             combd_heading_df_x_sessions, etc.). Raises if those products
             do not already exist.
+        use_stored_data_only : bool, optional
+            When True for agents: (1) skip the pre-pass that collects new agent
+            rollouts; (2) do not load saved ``combd_heading_df_x_sessions`` aggregates
+            — rebuild session-level headings only from per-``data_*`` files; (3) for
+            each ``data_*``, **only retrieve** existing ``heading_info_df`` from disk
+            — never call ``get_agent_data`` or ``make_heading_info_df_without_long_process``
+            to create new heading tables. The median/percentile pipeline still runs
+            from those retrieved headings (unlike ``high_level_only``).
+        save_combined_data : bool, optional
+            If True, write concatenated-across-data_* heading CSVs under
+            ``combd_heading_info`` (default False). This flag does **not** control
+            monkey-style pooled CSVs under ``cur_and_nxt/data_comparison/``: for
+            agents those are always skipped in :meth:`make_or_retrieve_all_ref_pooled_median_info`
+            and :meth:`make_or_retrieve_pooled_perc_info`. Export summaries via
+            ``save_dir`` in :meth:`process_and_save`.
+        combined_heading_data_exists_ok : bool, optional
+            When True (default), it is acceptable to load the pre-built
+            ``combd_heading_df_x_sessions`` aggregate if
+            ``intermediate_products_exist_ok`` also allows reuse. When False,
+            heading assembly always walks each ``data_*`` again (same path as when
+            the combined aggregate is missing), and the on-disk pooled
+            percentile product is not short-circuited via ``exists_ok`` so median
+            and percentile steps stay consistent.
         """
         save_data = False if use_stored_data_only else save_data
         self.num_steps_per_dataset = num_steps_per_dataset
+
+        combd_heading_df_x_sessions_exists_ok = (
+            intermediate_products_exist_ok and combined_heading_data_exists_ok)
+        pooled_perc_disk_exists_ok = (
+            final_products_exist_ok and combined_heading_data_exists_ok)
 
         if use_stored_data_only:
             # first check if any data exists at all
@@ -106,6 +138,9 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.all_ref_pooled_median_info = pd.read_csv(
                 self.all_ref_pooled_median_info_path).drop(
                 columns=['Unnamed: 0'], errors='ignore')
+            if 'id' not in self.all_ref_pooled_median_info.columns:
+                self.all_ref_pooled_median_info, _ = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(
+                    self.all_ref_pooled_median_info, self.model_folder_name)
             self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
             if not exists(self.pooled_perc_info_path):
                 raise FileNotFoundError(
@@ -115,62 +150,67 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.agent_all_perc_df = self.pooled_perc_info.copy()
             return
 
-        if not use_stored_data_only:
-            # make sure there's enough data from agent
-            for i in range(num_datasets_to_collect):
-                data_name = f'data_{i}'
-                print(' ')
-                print('model_folder_name:', model_folder_name)
-                print('data_name:', data_name)
-                # make a new instance of PlanFactorsOfAgent for each dataset for convenience
-                self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
-                                                                       data_name=data_name,
-                                                                       opt_arc_type=self.opt_arc_type,
-                                                                       )
-
-                # check to see if data exists:
-                if agent_data_exists_ok & exists(os.path.join(self.pfa.processed_data_folder_path, 'monkey_information.csv')):
-                    print('Data exists for this agent.')
-                    continue
-                print('Getting agent data ......')
-                env_kwargs['print_ff_capture_incidents'] = False
-
-                self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok,
-                                        save_data=save_data, n_steps=self.num_steps_per_dataset)
-
         try:
-            print(' ')
-            print('Making overall all median info ......')
+            # Applies to all heading aggregation triggered during median + perc phases.
+            self._save_combined_data = save_combined_data
 
-            self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode=ref_point_params_based_on_mode,
-                                                             list_of_curv_traj_window_before_stop=[
-                                                                 [-25, 0]],
-                                                             save_data=save_data,
-                                                             exists_ok=final_products_exist_ok,
-                                                             pooled_median_info_exists_ok=intermediate_products_exist_ok,
-                                                             combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
-                                                             stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                                             heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                                             use_stored_data_only=use_stored_data_only,
-                                                             num_datasets_to_collect=num_datasets_to_collect)
+            if not use_stored_data_only:
+                # make sure there's enough data from agent
+                for i in range(num_datasets_to_collect):
+                    data_name = f'data_{i}'
+                    print(' ')
+                    print('model_folder_name:', model_folder_name)
+                    print('data_name:', data_name)
+                    # make a new instance of PlanFactorsOfAgent for each dataset for convenience
+                    self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
+                                                                           data_name=data_name,
+                                                                           opt_arc_type=self.opt_arc_type,
+                                                                           )
 
-            self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
+                    # check to see if data exists:
+                    if agent_data_exists_ok & exists(os.path.join(self.pfa.processed_data_folder_path, 'monkey_information.csv')):
+                        print('Data exists for this agent.')
+                        continue
+                    print('Getting agent data ......')
+                    env_kwargs['print_ff_capture_incidents'] = False
 
-            print(' ')
-            print('Making all perc info ......')
-            self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                   verbose=True,
-                                                   exists_ok=final_products_exist_ok,
-                                                   stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                                   heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                                   save_data=save_data,
-                                                   use_stored_data_only=use_stored_data_only,
-                                                   num_datasets_to_collect=num_datasets_to_collect)
-            self.agent_all_perc_df = self.pooled_perc_info.copy()
-        except Exception as e:
-            print(f'Error making overall all median info: {e}')
-            raise Exception(
-                f'Error making either overall all median info or perc info: {e}')
+                    self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok,
+                                            save_data=save_data, n_steps=self.num_steps_per_dataset)
+
+            try:
+                print(' ')
+                print('Making overall all median info ......')
+
+                self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode=ref_point_params_based_on_mode,
+                                                                 list_of_curv_traj_window_before_stop=[
+                                                                     [-25, 0]],
+                                                                 exists_ok=final_products_exist_ok,
+                                                                 pooled_median_info_exists_ok=intermediate_products_exist_ok,
+                                                                 combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+                                                                 stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                                                 heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                                                 use_stored_data_only=use_stored_data_only,
+                                                                 num_datasets_to_collect=num_datasets_to_collect)
+
+                self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
+
+                print(' ')
+                print('Making all perc info ......')
+                self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                       verbose=True,
+                                                       exists_ok=pooled_perc_disk_exists_ok,
+                                                       stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                                       heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                                       use_stored_data_only=use_stored_data_only,
+                                                       num_datasets_to_collect=num_datasets_to_collect)
+                self.agent_all_perc_df = self.pooled_perc_info.copy()
+            except Exception as e:
+                print(f'Error making overall all median info: {e}')
+                raise Exception(
+                    f'Error making either overall all median info or perc info: {e}')
+        finally:
+            if hasattr(self, '_save_combined_data'):
+                del self._save_combined_data
 
     def get_plan_features_df_across_sessions(self,
                                              num_datasets_to_collect=1,
@@ -297,6 +337,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                          use_curv_to_ff_center=False,
                                          save_data=True,
                                          use_stored_data_only=False,
+                                         save_combined_data=None,
+                                         slim_save=True,
                                          **env_kwargs
                                          ):
         self.test_heading_info_df = pd.DataFrame()
@@ -338,10 +380,13 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     n_steps=self.num_steps_per_dataset,
                     use_stored_data_only=use_stored_data_only,
                     test_or_control_filter=self.test_or_control_filter,
+                    slim_save=slim_save,
                     **env_kwargs)
                 self._add_heading_info_to_combd_heading_info(
                     data_name)
             except Exception as e:
+                if use_stored_data_only:
+                    raise
                 print(f'Warning: Could not get heading info for data_{i}: {e}')
                 if self.test_or_control_filter:
                     print(
@@ -361,7 +406,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.test_heading_info_df.reset_index(drop=True, inplace=True)
         self.ctrl_heading_info_df.reset_index(drop=True, inplace=True)
 
-        if save_data:
+        # Concatenated-across-data_* heading CSVs live under combd_cur_and_nxt/.../combd_heading_info/.
+        # Per-dataset artifacts still follow save_data on get_test_and_ctrl_heading_info_df_for_one_session.
+        if save_combined_data is None:
+            save_combined_data = getattr(
+                self, '_save_combined_data', True)
+        if save_data and save_combined_data:
             # Determine which types to save
             types_to_save = ['test', 'control'] if self.test_or_control_filter is None else [
                 self.test_or_control_filter]
@@ -376,12 +426,16 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                         'monkey_agent', ref_point_mode, ref_point_value)
                     df_path = os.path.join(path, df_name)
                     os.makedirs(path, exist_ok=True)
+                    if slim_save:
+                        df_to_save = df_to_save.drop(columns=_HEADING_INFO_SLIM_DROP_COLS, errors='ignore')
                     df_to_save.to_csv(df_path)
                     print(
                         f'Stored new combd_heading_df_x_sessions for {test_or_control} data in {df_path}')
                 else:
                     print(
                         f'Skipping save for {test_or_control} data - dataframe is empty')
+        elif save_data and not save_combined_data:
+            print('Skipping save of combd_heading_df_x_sessions (save_combined_data=True).')
 
     def get_test_and_ctrl_heading_info_df_across_sessions(self,
                                                           num_datasets_to_collect=1,
@@ -396,6 +450,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           use_stored_data_only=False,
+                                                          save_combined_data=None,
+                                                          slim_save=True,
                                                           **env_kwargs
                                                           ):
 
@@ -442,6 +498,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                   use_curv_to_ff_center=use_curv_to_ff_center,
                                                   save_data=save_data,
                                                   use_stored_data_only=use_stored_data_only,
+                                                  save_combined_data=save_combined_data,
+                                                  slim_save=slim_save,
                                                   **env_kwargs)
 
             print(
@@ -517,6 +575,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                            save_data=True,
                                                            filter_heading_info_df_across_refs=False,
                                                            use_stored_data_only=False,
+                                                           save_combined_data=None,
                                                            **kwargs):
         """
         Override parent method to support test_or_control_filter for agents.
@@ -524,6 +583,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         """
 
         save_data = False if use_stored_data_only else save_data
+
+        if use_stored_data_only:
+            # Per-dataset heading CSVs only; do not load combd_heading_df_x_sessions aggregates.
+            combd_heading_df_x_sessions_exists_ok = False
 
         # Call the agent-specific version with filter support
         self.get_test_and_ctrl_heading_info_df_across_sessions(
@@ -536,6 +599,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             save_data=save_data,
             combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
             use_stored_data_only=use_stored_data_only,
+            save_combined_data=save_combined_data,
             **kwargs
         )
 
@@ -574,10 +638,15 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             kwargs['exists_ok'] = False # to make sure to use the right num_datasets_to_collect
             kwargs['pooled_median_info_exists_ok'] = False # to make sure to use the right num_datasets_to_collect
 
+            # Agents keep pooled aggregates in memory only; monkey pipelines default save_combined_data=True.
+            kwargs['save_combined_data'] = True
+
             self.all_ref_pooled_median_info = super(
             ).make_or_retrieve_all_ref_pooled_median_info(
                 **kwargs)
+            # Tag rows as agent and record how many datasets were used
             self.all_ref_pooled_median_info['monkey_name'] = 'agent'
+            self.all_ref_pooled_median_info['num_datasets'] = self.num_datasets_to_collect
 
             # Filter by test_or_control if specified
             # Only filter if the column exists (it might not exist if data was already filtered at retrieval)
@@ -591,6 +660,9 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 else:
                     print(
                         'Note: test_or_control column not found. Data was already filtered at retrieval level.')
+
+            self.all_ref_pooled_median_info, _ = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(
+                self.all_ref_pooled_median_info, self.model_folder_name)
         finally:
             pass
 
@@ -631,7 +703,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     heading_info_df_exists_ok=heading_info_df_exists_ok,
                     stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                     filter_heading_info_df_across_refs=filter_heading_info_df_across_refs,
-                    use_stored_data_only=use_stored_data_only)
+                    use_stored_data_only=use_stored_data_only,
+                    save_combined_data=getattr(
+                        self, '_save_combined_data', None),
+                )
 
                 # Enable single condition support when filtering
                 allow_single = self.test_or_control_filter is not None
@@ -643,13 +718,20 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     allow_single_condition=allow_single,
                     )
 
-                if save_data:
-                    self.pooled_perc_info.to_csv(self.pooled_perc_info_path)
-                    print('Stored new pooled_perc_info in ',
-                        self.pooled_perc_info_path)
+                # Do not write pooled_perc_info under cur_and_nxt for agents.
 
             self.pooled_perc_info['monkey_name'] = 'agent'
             self.pooled_perc_info['opt_arc_type'] = self.opt_arc_type
+            # Record number of datasets used to create these pooled percentiles
+            self.pooled_perc_info['num_datasets'] = self.num_datasets_to_collect
+
+            self.pooled_perc_info, _ = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(
+                self.pooled_perc_info, self.model_folder_name)
+
+            if save_data:
+                os.makedirs(os.path.dirname(self.pooled_perc_info_path), exist_ok=True)
+                self.pooled_perc_info.to_csv(self.pooled_perc_info_path, index=False)
+                print(f'Saved pooled_perc_info to {self.pooled_perc_info_path}')
         finally:
             # Clean up instance variable
             pass
@@ -659,11 +741,13 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
     def process_and_save(self,
                         save_dir,
                         intermediate_products_exist_ok=True,
+                        combined_heading_data_exists_ok=True,
                         agent_data_exists_ok=True,
                         num_steps_per_dataset=9000,
                         num_datasets_to_collect=2,
                         use_stored_data_only=False,
                         high_level_only=False,
+                        save_combined_data=True,
                         verbose=False):
         """
         Process a single agent and save results to CSV files.
@@ -677,6 +761,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             Directory where output CSV files will be saved
         intermediate_products_exist_ok : bool, optional
             Whether to reuse existing intermediate products (default: True)
+        combined_heading_data_exists_ok : bool, optional
+            Passed to :meth:`streamline_getting_y_values`. When False, always
+            rebuild combined heading from each ``data_*`` instead of loading the
+            saved aggregate (see that method for details).
         agent_data_exists_ok : bool, optional
             Whether to reuse existing agent data (default: True)
         num_steps_per_dataset : int, optional
@@ -684,7 +772,14 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         num_datasets_to_collect : int, optional
             Number of datasets to collect (default: 2)
         use_stored_data_only : bool, optional
-            If True, only use stored data without generating new data (default: False)
+            If True, offline mode: no new agent rollouts, and per-``data_*``
+            ``heading_info_df`` is **retrieve-only** (see
+            :meth:`streamline_getting_y_values`).
+        save_combined_data : bool, optional
+            Forwarded to :meth:`streamline_getting_y_values` (default False): only gates
+            concatenated ``combd_heading_info`` CSVs. Agent pooled caches under
+            ``cur_and_nxt/data_comparison/`` are never written regardless of this flag;
+            use ``save_dir`` for exported median/perc tables.
         verbose : bool, optional
             If True, print all progress messages from this method and all
             nested calls. If False, suppress all stdout output (default: True)
@@ -699,22 +794,26 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             return self._process_and_save_inner(
                 save_dir=save_dir,
                 intermediate_products_exist_ok=intermediate_products_exist_ok,
+                combined_heading_data_exists_ok=combined_heading_data_exists_ok,
                 agent_data_exists_ok=agent_data_exists_ok,
                 num_steps_per_dataset=num_steps_per_dataset,
                 num_datasets_to_collect=num_datasets_to_collect,
                 use_stored_data_only=use_stored_data_only,
                 high_level_only=high_level_only,
+                save_combined_data=save_combined_data,
                 verbose=verbose,
             )
 
     def _process_and_save_inner(self,
                                 save_dir,
                                 intermediate_products_exist_ok,
+                                combined_heading_data_exists_ok,
                                 agent_data_exists_ok,
                                 num_steps_per_dataset,
                                 num_datasets_to_collect,
                                 use_stored_data_only,
                                 high_level_only,
+                                save_combined_data,
                                 verbose):
 
         print(f'[PROCESS] Processing agent folder: {self.model_folder_name}')
@@ -728,16 +827,17 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.streamline_getting_y_values(
                 model_folder_name=self.model_folder_name,
                 intermediate_products_exist_ok=intermediate_products_exist_ok,
+                combined_heading_data_exists_ok=combined_heading_data_exists_ok,
                 agent_data_exists_ok=agent_data_exists_ok,
                 num_datasets_to_collect=num_datasets_to_collect,
                 num_steps_per_dataset=num_steps_per_dataset,
                 use_stored_data_only=use_stored_data_only,
                 save_data=save_data,
                 high_level_only=high_level_only,
+                save_combined_data=save_combined_data,
             )
 
-            self.all_ref_pooled_median_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.all_ref_pooled_median_info, self.model_folder_name)
-            self.pooled_perc_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.pooled_perc_info, self.model_folder_name)
+            agent_id = rl_base_utils.extract_config_name_from_post_best(self.model_folder_name)
             print(f'[PROCESS] Agent ID: {agent_id}')
 
             # Create save directory
@@ -761,6 +861,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             return (median_path, perc_path)
 
         except Exception as e:
+
             # Print errors to stderr so they always surface regardless of verbose
             print(f'[PROCESS][ERROR] Failed to process agent {self.model_folder_name}: {e}', file=sys.stderr)
             import traceback

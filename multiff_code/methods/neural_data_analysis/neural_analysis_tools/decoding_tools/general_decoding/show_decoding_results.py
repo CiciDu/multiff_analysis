@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from data_wrangling import combine_info_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_feature_selection.task_feat_keep_registry import (
+    filter_decoding_results_by_task_feat_keep,
+)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import \
     cv_decoding
 from scipy.stats import ttest_rel
@@ -137,6 +140,9 @@ def collect_all_session_decoding_results(
                 session_results_df = session_results_df[
                     session_results_df['model_name'] == model_name
                 ].reset_index(drop=True)
+
+        session_results_df = filter_decoding_results_by_task_feat_keep(
+            session_results_df, task_class)
 
         if 'cv_mode' not in session_results_df.columns:
             inferred_cv_mode = None
@@ -272,43 +278,11 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     summary_df = summary_df.copy()
     max_height = 20
 
-    mean_by_feature = (
-        summary_df
-        .groupby('behav_feature')['mean_value']
-        .mean()
+    feature_order, mean_by_feature = _feature_order_for_decoding_summary(
+        summary_df,
+        var_categories=var_categories,
+        sort_by_mean=sort_by_mean,
     )
-
-    if sort_by_mean:
-        feature_order = mean_by_feature.sort_values().index.tolist()
-    elif var_categories is not None and 'var_category' in summary_df.columns:
-        feature_order = []
-        present_categories = summary_df['var_category'].dropna().unique().tolist()
-        ordered_categories = [
-            c for c in var_categories.keys() if c in present_categories
-        ]
-        for cat in ordered_categories:
-            sub = summary_df.query("var_category == @cat")
-            feats = sub['behav_feature'].unique().tolist()
-            feats_sorted = sorted(feats, key=lambda f: mean_by_feature[f])
-            feature_order.extend(feats_sorted)
-        remaining_feats = [
-            f for f in mean_by_feature.index.tolist() if f not in feature_order
-        ]
-        if remaining_feats:
-            remaining_sorted = (
-                mean_by_feature.loc[remaining_feats]
-                .sort_values()
-                .index
-                .tolist()
-            )
-            feature_order.extend(remaining_sorted)
-    else:
-        feature_order = (
-            mean_by_feature
-            .sort_values()
-            .index
-            .tolist()
-        )
 
     summary_df['behav_feature'] = pd.Categorical(
         summary_df['behav_feature'],
@@ -598,6 +572,66 @@ def _compute_summary(df, value_col, hue_col=None):
     return summary
 
 
+def _infer_decode_summary_hue_col(df):
+    """Hue column passed to _compute_summary; mirrors visualize_decoding_results."""
+    if df is None or len(df) == 0:
+        return None
+    if 'result_group' in df.columns and df['result_group'].nunique() > 1:
+        return 'result_group'
+    return None
+
+
+def _feature_order_for_decoding_summary(summary_df, var_categories=None, sort_by_mean=False):
+    """
+    Y-axis category order used by _plot_decoding_summary (index 0 = bottom tick).
+
+    Returns
+    -------
+    feature_order : list
+    mean_by_feature : pd.Series
+    """
+    summary_df = summary_df.copy()
+    mean_by_feature = (
+        summary_df
+        .groupby('behav_feature')['mean_value']
+        .mean()
+    )
+
+    if sort_by_mean:
+        feature_order = mean_by_feature.sort_values().index.tolist()
+    elif var_categories is not None and 'var_category' in summary_df.columns:
+        feature_order = []
+        present_categories = summary_df['var_category'].dropna().unique().tolist()
+        ordered_categories = [
+            c for c in var_categories.keys() if c in present_categories
+        ]
+        for cat in ordered_categories:
+            sub = summary_df.query("var_category == @cat")
+            feats = sub['behav_feature'].unique().tolist()
+            feats_sorted = sorted(feats, key=lambda f: mean_by_feature[f])
+            feature_order.extend(feats_sorted)
+        remaining_feats = [
+            f for f in mean_by_feature.index.tolist() if f not in feature_order
+        ]
+        if remaining_feats:
+            remaining_sorted = (
+                mean_by_feature.loc[remaining_feats]
+                .sort_values()
+                .index
+                .tolist()
+            )
+            feature_order.extend(remaining_sorted)
+    else:
+        feature_order = (
+            mean_by_feature
+            .sort_values()
+            .index
+            .tolist()
+        )
+
+    return feature_order, mean_by_feature
+
+
 def compute_fold_diagnostics(df, score_col):
 
     fold_stats = (
@@ -647,34 +681,75 @@ def plot_fold_diagnostics(
     compare_plot='difference',
     diff_vmin=None,
     diff_vmax=None,
+    model_name=None,
+    var_categories=None,
+    regression_metric_col='r2_cv',
+    classification_metric_col='auc_mean',
+    order_summary=None,
 ):
-    result_df = all_results.query(f"mode == '{mode}'")
-    value_col = 'r2_cv' if mode == 'regression' else 'auc_mean'
-    result_summary = _compute_summary(result_df, value_col)
+    """
+    Session×fold heatmaps in the same feature order as ``visualize_decoding_results``.
 
-    mean_by_feature = (
-        result_summary
-        .groupby('behav_feature', dropna=False)['mean_value']
-        .mean()
+    Parameters
+    ----------
+    model_name, var_categories, regression_metric_col
+        Should match the arguments passed to ``visualize_decoding_results`` so the
+        summary statistics (and default ordering) match the strip plot.
+    order_summary : pd.DataFrame, optional
+        Summary frame returned by ``visualize_decoding_results`` (e.g. ``reg_summary``
+        for regression). Use this when the strip plot was built from
+        ``decoding_results_dfs`` but heatmaps use a single slice of that dict: ordering
+        is then identical to the multi-panel summary (including averaging across
+        ``result_group`` for sort-by-mean).
+    """
+    vc = DEFAULT_DECODING_VAR_CATEGORIES if var_categories is None else var_categories
+
+    value_col = (
+        regression_metric_col if mode == 'regression' else classification_metric_col
     )
+
+    df = _prepare_decoding_df(all_results)
+    if model_name is not None:
+        df = df.query('model_name == @model_name').copy()
+
+    df = _add_var_category_column(df, var_categories=vc)
+    result_df = df.query(f"mode == '{mode}'").copy()
+    if len(result_df) == 0:
+        raise ValueError(f"No rows after filter for mode={mode!r}")
+
+    hue_col = _infer_decode_summary_hue_col(result_df)
+    result_summary = _compute_summary(result_df, value_col, hue_col=hue_col)
+
+    sort_by_mean = mode == 'regression'
+    if order_summary is not None and len(order_summary) > 0:
+        order_src = order_summary
+    else:
+        order_src = result_summary
+
+    feature_order, mean_by_feature = _feature_order_for_decoding_summary(
+        order_src,
+        var_categories=vc,
+        sort_by_mean=sort_by_mean,
+    )
+
+    present = set(result_df['behav_feature'].dropna().unique())
+    # Strip plot y: categories[0] at bottom, last at top — iterate top → bottom.
+    plot_sequence = [f for f in reversed(feature_order) if f in present]
+    for f in present:
+        if f not in plot_sequence:
+            plot_sequence.append(f)
 
     result_summary = result_summary.sort_values('mean_value', ascending=False)
 
-    # One heatmap per feature: order by aggregate mean decoding; append any
-    # feature present in raw rows but absent from summary (defensive).
-    features_ordered = mean_by_feature.sort_values(ascending=False).index.tolist()
-    for f in result_df['behav_feature'].dropna().unique():
-        if f not in features_ordered:
-            features_ordered.append(f)
-
-    for behav_feature in features_ordered:
+    for behav_feature in plot_sequence:
         print(behav_feature)
         try:
             plot_fold_session_heatmap(
                 all_results,
-                model_name=None,
+                model_name=model_name,
                 mode=mode,
                 behav_feature=behav_feature,
+                score_col=value_col,
                 vmin=vmin,
                 vmax=vmax,
                 compare_results=compare_results,
@@ -727,11 +802,16 @@ def run_and_analyze_decoding_sweep(
         key_b = keys[1] if key_a == keys[0] else keys[0]
 
     # ALWAYS call diagnostics
+    order_summary = reg_summary if mode == 'regression' else clf_summary
+
     kwargs = dict(
         all_results=all_results_dict[key_a],
         mode=mode,
         vmin=vmin,
         vmax=vmax,
+        model_name=model_name,
+        var_categories=runner.var_categories,
+        order_summary=order_summary,
     )
 
     if key_b is not None:

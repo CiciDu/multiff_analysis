@@ -199,7 +199,7 @@ class BaseProcessing:
             self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, 10, 25)
         if to_furnish_ff_dataframe:
             self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
-                                                                       self.ff_caught_T_new, self.ff_life_sorted)
+                                                                       self.ff_caught_T_new, self.ff_life_sorted, self.monkey_information)
 
     def make_or_retrieve_closest_stop_to_capture_df(self, exists_ok=True):
         path = os.path.join(self.processed_data_folder_path,

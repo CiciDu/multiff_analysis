@@ -30,9 +30,11 @@ class _CompareYValues:
     def make_or_retrieve_all_ref_pooled_median_info(self,
                                                     process_info_for_plotting=True,
                                                     use_stored_data_only=False,
+                                                    save_combined_data=True,
                                                     **kwargs):
         self.all_ref_pooled_median_info = self._make_or_retrieve_all_ref_median_info(
-            per_sess=False, use_stored_data_only=use_stored_data_only, 
+            per_sess=False, use_stored_data_only=use_stored_data_only,
+            save_combined_data=save_combined_data,
             **kwargs)
         if process_info_for_plotting:
             self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
@@ -60,6 +62,7 @@ class _CompareYValues:
                                               stops_near_ff_df_exists_ok=True,
                                               heading_info_df_exists_ok=True,
                                               use_stored_data_only=False,
+                                              save_combined_data=True,
                                               ):
 
         save_data = False if use_stored_data_only else save_data                                      
@@ -85,6 +88,7 @@ class _CompareYValues:
                                                                                                                           'per_sess_median_info_exists_ok': per_sess_median_info_exists_ok,
                                                                                                                           'curv_traj_window_before_stop': curv_traj_window_before_stop,
                                                                                                                           'save_data': save_data,
+                                                                                                                          'save_combined_data': save_combined_data,
                                                                                                                           'combd_heading_df_x_sessions_exists_ok': combd_heading_df_x_sessions_exists_ok,
                                                                                                                           'stops_near_ff_df_exists_ok': stops_near_ff_df_exists_ok,
                                                                                                                           'heading_info_df_exists_ok': heading_info_df_exists_ok,
@@ -100,18 +104,23 @@ class _CompareYValues:
         all_info.reset_index(drop=True, inplace=True)
         all_info['monkey_name'] = self.monkey_name
         all_info['opt_arc_type'] = self.opt_arc_type
-        all_info.to_csv(df_path)
-        if per_sess:
-            print(
-                f'Saved all_ref_per_sess_median_info to {self.all_ref_per_sess_median_info_folder_path}')
+        if save_combined_data:
+            all_info.to_csv(df_path)
+            if per_sess:
+                print(
+                    f'Saved all_ref_per_sess_median_info to {self.all_ref_per_sess_median_info_folder_path}')
+            else:
+                print(
+                    f'Saved all_ref_pooled_median_info to {df_path}')
         else:
             print(
-                f'Saved all_ref_pooled_median_info to {df_path}')
+                'Skipping save of all_ref_*_median_info aggregate under cur_and_nxt '
+                '(save_combined_data=True).')
 
         return all_info
 
     def make_or_retrieve_per_sess_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                            ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
+                                            ref_point_mode='distance', ref_point_value=-50, verbose=False, save_combined_data=True,
                                             filter_heading_info_df_across_refs=False,
                                             ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
@@ -132,7 +141,7 @@ class _CompareYValues:
         # this doesn't matter for perc info
         self.per_sess_perc_info['curv_traj_window_before_stop'] = '[-25, 0]'
 
-        if save_data:
+        if save_combined_data:
             self.per_sess_perc_info.to_csv(self.per_sess_perc_info_path)
         print('Stored new per_sess_perc_info in ',
               self.per_sess_perc_info_path)
@@ -140,14 +149,13 @@ class _CompareYValues:
         return self.per_sess_perc_info
 
     def make_or_retrieve_pooled_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                          ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
+                                          ref_point_mode='distance', ref_point_value=-50, verbose=False, 
                                           filter_heading_info_df_across_refs=False,
                                           use_stored_data_only=False,
+                                          save_combined_data=True,
                                           ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
-
-        save_data = False if use_stored_data_only else save_data
 
         if exists_ok & exists(self.pooled_perc_info_path):
             self.pooled_perc_info = pd.read_csv(self.pooled_perc_info_path).drop(
@@ -159,10 +167,11 @@ class _CompareYValues:
             self.pooled_perc_info = make_variations_utils.make_pooled_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
                                                                                                                    self.ctrl_heading_info_df, verbose=verbose)
 
-            if save_data:
+            if save_combined_data:
                 self.pooled_perc_info.to_csv(self.pooled_perc_info_path)
-            print('Stored new pooled_perc_info in ',
-                  self.pooled_perc_info_path)
+                print('Stored new pooled_perc_info in ',
+                      self.pooled_perc_info_path)
+
 
         self.pooled_perc_info['monkey_name'] = self.monkey_name
         self.pooled_perc_info['opt_arc_type'] = self.opt_arc_type
@@ -205,6 +214,7 @@ class _CompareYValues:
                           save_data: bool = True,
                           filter_heading_info_df_across_refs=False,
                           use_stored_data_only=False,
+                          save_combined_data=True,
                           **kwargs):
         """
         Unified builder for median-info DataFrames.
@@ -275,10 +285,10 @@ class _CompareYValues:
             "monkey_name": getattr(self, "monkey_name", None),
         })
 
-        if save_data:
+        setattr(self, cfg["df_attr"], df)
+        if save_combined_data:
             Path(folder).mkdir(parents=True, exist_ok=True)
             df.to_csv(path, index=False)
-            setattr(self, cfg["df_attr"], df)
             print(f"Stored new {cfg['human_name']} in {folder}")
         return df
 
@@ -335,6 +345,7 @@ class _CompareYValues:
                                 heading_info_df_exists_ok=True,
                                 verbose=False, save_data=True,
                                 use_stored_data_only=False,
+                                save_combined_data=True,
                                 **kwargs
                                 ):
         save_data = False if use_stored_data_only else save_data
@@ -351,6 +362,7 @@ class _CompareYValues:
             verbose=verbose,
             save_data=save_data,
             use_stored_data_only=use_stored_data_only,
+            save_combined_data=save_combined_data,
         )
 
     def make_per_sess_median_info(self,
@@ -362,6 +374,7 @@ class _CompareYValues:
                                   stops_near_ff_df_exists_ok=True,
                                   heading_info_df_exists_ok=True,
                                   verbose=False, save_data=True,
+                                  save_combined_data=True,
                                   **kwargs):
         return self._make_median_info(
             kind="per_sess",
@@ -374,6 +387,7 @@ class _CompareYValues:
             heading_info_df_exists_ok=heading_info_df_exists_ok,
             verbose=verbose,
             save_data=save_data,
+            save_combined_data=save_combined_data,
             **kwargs,
         )
 

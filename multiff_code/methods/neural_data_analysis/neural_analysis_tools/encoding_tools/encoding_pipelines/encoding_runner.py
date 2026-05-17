@@ -73,6 +73,10 @@ class EncodingRunner:
     def collect_data(self, exists_ok: bool = True):
         self.task.collect_data(exists_ok=exists_ok)
 
+    @property
+    def num_neurons(self) -> int:
+        return self.get_effective_num_neurons()
+
     def get_effective_num_neurons(self) -> int:
         """Neuron count valid for both response matrix and design metadata."""
         self.task.collect_data(exists_ok=True)
@@ -186,10 +190,15 @@ class EncodingRunner:
     def get_gam_groups(self):
         from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
             encoding_design_utils
+        design_columns = None
+        design_df = getattr(self.task, "_design_df", None)
+        if design_df is not None:
+            design_columns = design_df.columns
         return encoding_design_utils.build_gam_groups_from_meta(
             self.task.structured_meta_groups,
             lam_f=self.model.lambda_config['lam_f'],
             lam_g=self.model.lambda_config['lam_g'],
             lam_h=self.model.lambda_config['lam_h'],
             lam_p=self.model.lambda_config['lam_p'],
+            design_columns=design_columns,
         )

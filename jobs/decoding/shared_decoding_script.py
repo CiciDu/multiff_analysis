@@ -13,7 +13,7 @@ def run_decoding_main(
     task_class: Type[TaskT],
     *,
     model_class = decoding_models.CVDecodingModel,
-    cv_mode: str = "blocked_time_buffered",
+    #cv_mode: str = "blocked_time_buffered",
     use_spike_history: bool = False,
     run_kwargs: Optional[dict[str, Any]] = None,
     task_kwargs: Optional[dict[str, Any]] = None,
@@ -43,46 +43,48 @@ def run_decoding_main(
 
     args = parser.parse_args()
 
-    for smoothing_width in [10, 20]:
-        print(f"Running with smoothing_width={smoothing_width}")
-    
-        task_kwargs = task_kwargs or {}
-        model_kwargs = model_kwargs or {}
-        runner = decoding_runner.DecodingRunner(
-            task_class(
-            raw_data_folder_path=args.raw_data_folder_path,
-            bin_width=args.bin_width,
-            smoothing_width=smoothing_width,
-            use_spike_history=use_spike_history,
-            **task_kwargs,
-            ),
-            model_class(
-                cv_mode=cv_mode,
-                **model_kwargs,
-            ),
-        )
-
-        runner.collect_data(exists_ok=True)
-
-        run_kwargs = run_kwargs or {}
-        common_run = dict(
-            n_splits=args.n_splits,
-            save_dir=args.save_dir,
-            fit_kernelwidth=True,
-            **run_kwargs,
-        )
-
-
-        results_df = runner.run(
-            **common_run,
-            shuffle_mode='none',
-        )
+    # for cv_mode in ['matlab_interleaved', 'blocked_time_buffered', 'group_kfold']: # note, fs can't use group_kfold
+    for cv_mode in ['matlab_interleaved']:
+        for smoothing_width in [None, 10, 20, 40]:
+            print(f"Running with smoothing_width={smoothing_width}")
         
-        # results_df_shuffled = runner.run(
-        #     **common_run,
-        #     shuffle_mode='timeshift_fold',
-        # )
+            task_kwargs = task_kwargs or {}
+            model_kwargs = model_kwargs or {}
+            runner = decoding_runner.DecodingRunner(
+                task_class(
+                raw_data_folder_path=args.raw_data_folder_path,
+                bin_width=args.bin_width,
+                smoothing_width=smoothing_width,
+                use_spike_history=use_spike_history,
+                **task_kwargs,
+                ),
+                model_class(
+                    cv_mode=cv_mode,
+                    **model_kwargs,
+                ),
+            )
 
-        # results_one_ff_style = runner.run_one_ff_style()
+            runner.collect_data(exists_ok=True)
+
+            run_kwargs = run_kwargs or {}
+            common_run = dict(
+                n_splits=args.n_splits,
+                save_dir=args.save_dir,
+                fit_kernelwidth=True,
+                **run_kwargs,
+            )
+
+
+            results_df = runner.run(
+                **common_run,
+                shuffle_mode='none',
+            )
+            
+            # results_df_shuffled = runner.run(
+            #     **common_run,
+            #     shuffle_mode='timeshift_fold',
+            # )
+
+            # results_one_ff_style = runner.run_one_ff_style()
 
     return 

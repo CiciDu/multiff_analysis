@@ -4,7 +4,7 @@ import re
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Collection, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -805,9 +805,17 @@ def build_hist_meta_from_colnames(
     dt: float,
     t_max: float,
     n_basis: int = 20,
+    include_coupling: bool = True,
 ) -> Dict[str, Any]:
     """
     Build histogram meta structure from cluster colnames.
+
+    Parameters
+    ----------
+    include_coupling : bool
+        If False, only the target neuron's ``spike_hist`` group is included
+        (no ``cpl_*`` cross-neuron groups). Use when ``use_neural_coupling``
+        is disabled.
 
     Returns:
         dict with 'groups' and 'basis_info' keys.
@@ -840,9 +848,12 @@ def build_hist_meta_from_colnames(
     if target_col is not None:
         if target_col not in colnames:
             raise KeyError(f'target_col {target_col!r} not in colnames')
-        neuron_order = [target_col] + [
-            n for n in neuron_order if n != target_col
-        ]
+        if include_coupling:
+            neuron_order = [target_col] + [
+                n for n in neuron_order if n != target_col
+            ]
+        else:
+            neuron_order = [target_col]
 
     for i, neuron in enumerate(neuron_order):
         cols = colnames[neuron]
@@ -1235,14 +1246,22 @@ def build_gam_groups_from_meta(
     lam_g: float = 100.0,
     lam_h: float = 10.0,
     lam_p: float = 10.0,
+    design_columns: Optional[Collection[str]] = None,
 ) -> Tuple[List[GroupSpec], Dict[str, float]]:
     """
     Build GroupSpec list and lambda_config for stop-encoding Poisson GAM from
     `structured_meta_groups` instead of a full `design_df`.
 
-    Additionally validates that every column in design_df is assigned
-    to exactly one group.
+    Parameters
+    ----------
+    design_columns : collection of str, optional
+        When provided, each group's column list is intersected with these names
+        and groups with no remaining columns are omitted (e.g. drop ghost
+        ``cpl_*`` groups when coupling columns are not in the design matrix).
     """
+    design_col_set = (
+        set(design_columns) if design_columns is not None else None
+    )
     tuning_meta = structured_meta_groups.get('tuning', {}) or {}
     temporal_meta = structured_meta_groups.get('temporal', {}) or {}
     hist_meta = structured_meta_groups.get('hist', {}) or {}
@@ -1254,6 +1273,8 @@ def build_gam_groups_from_meta(
     # -------------------------
     temporal_groups = temporal_meta.get('groups', {}) if temporal_meta else {}
     for name, cols in temporal_groups.items():
+        if design_col_set is not None:
+            cols = [c for c in cols if c in design_col_set]
         if not cols:
             continue
         groups.append(GroupSpec(name, list(cols), 'event', lam_g))
@@ -1263,6 +1284,8 @@ def build_gam_groups_from_meta(
     # -------------------------
     tuning_groups = tuning_meta.get('groups', {}) if tuning_meta else {}
     for var, cols in tuning_groups.items():
+        if design_col_set is not None:
+            cols = [c for c in cols if c in design_col_set]
         if not cols:
             continue
         groups.append(GroupSpec(var, list(cols), '1D', lam_f))
@@ -1274,6 +1297,8 @@ def build_gam_groups_from_meta(
     # -------------------------
     hist_groups = hist_meta.get('groups', {}) if hist_meta else {}
     for i, (gname, cols) in enumerate(hist_groups.items()):
+        if design_col_set is not None:
+            cols = [c for c in cols if c in design_col_set]
         if not cols:
             continue
         lam = lam_h if (i == 0 or gname == 'spike_hist') else lam_p

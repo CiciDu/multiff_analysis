@@ -244,6 +244,7 @@ class BaseEncodingTask:
             dt=self.bin_width,
             t_max=spike_hist_t_max,
             n_basis=n_basis_hist,
+            include_coupling=getattr(self, "use_neural_coupling", False),
         )
 
     def _make_structured_meta_groups(self):

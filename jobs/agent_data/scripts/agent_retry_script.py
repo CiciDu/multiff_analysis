@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description='Run agent retry analysis')
     parser.add_argument('--agent-path', type=str, required=True,
                         help='Agent folder path to process')
-    parser.add_argument('--num-datasets-to-collect', type=int, default=5,
+    parser.add_argument('--num-datasets-to-collect', type=int, default=20,
                         help='Number of datasets to collect')
     args = parser.parse_args()
 

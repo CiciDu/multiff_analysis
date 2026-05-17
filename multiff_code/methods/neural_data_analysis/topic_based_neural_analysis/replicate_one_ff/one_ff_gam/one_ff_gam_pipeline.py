@@ -131,6 +131,7 @@ class OneFFGAMRunner:
         n_folds: int,
         buffer_samples: int,
         load_if_exists: bool = True,
+        cv_mode: str = 'matlab_interleaved',
     ):
         return gam_variance_explained._crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
@@ -142,7 +143,7 @@ class OneFFGAMRunner:
             fit_kwargs=self._default_fit_kwargs(),
             save_path=save_path,
             load_if_exists=load_if_exists,
-            cv_mode="group_kfold",
+            cv_mode=cv_mode,
             buffer_samples=buffer_samples,
         )
 
@@ -188,10 +189,22 @@ class OneFFGAMRunner:
 
     @staticmethod
     def _full_model_cv_path(outdir: Path) -> Path:
+        return outdir / "cv_var_explained"
+
+    @staticmethod
+    def _full_model_cv_file(outdir: Path, cv_mode: Optional[str] = None) -> Path:
+        if cv_mode:
+            return outdir / "cv_var_explained" / cv_mode / "full_model.pkl"
         return outdir / "cv_var_explained" / "full_model.pkl"
 
     @staticmethod
     def _category_cv_path(outdir: Path, category_name: str) -> Path:
+        return outdir / "cv_var_explained"
+
+    @staticmethod
+    def _category_cv_file(outdir: Path, category_name: str, cv_mode: Optional[str] = None) -> Path:
+        if cv_mode:
+            return outdir / "cv_var_explained" / cv_mode / f"leave_out_{category_name}.pkl"
         return outdir / "cv_var_explained" / f"leave_out_{category_name}.pkl"
 
     def _compute_category_variance_contributions(
@@ -206,9 +219,12 @@ class OneFFGAMRunner:
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        cv_mode: str = 'matlab_interleaved',
     ):
         all_group_names = [g.name for g in groups]
         (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
+        if cv_mode:
+            (outdir / "cv_var_explained" / cv_mode).mkdir(parents=True, exist_ok=True)
 
         if category_names is None:
             category_names = list(self.var_categories.keys())
@@ -220,7 +236,8 @@ class OneFFGAMRunner:
                     f"Available: {list(self.var_categories.keys())}"
                 )
 
-        full_path = self._full_model_cv_path(outdir)
+        full_path = self._full_model_cv_file(outdir, cv_mode=cv_mode)
+        full_path.parent.mkdir(parents=True, exist_ok=True)
         if retrieve_only:
             full_cv = gam_variance_explained.maybe_load_saved_crossval(
                 save_path=full_path,
@@ -239,6 +256,7 @@ class OneFFGAMRunner:
                 n_folds=n_folds,
                 buffer_samples=buffer_samples,
                 load_if_exists=load_if_exists,
+                cv_mode=cv_mode,
             )
 
         contributions = {}
@@ -252,10 +270,10 @@ class OneFFGAMRunner:
                 keep_group_names=keep_group_names,
             )
 
-            loo_path = self._category_cv_path(outdir, category_name)
+            loo_path = self._category_cv_file(outdir, category_name, cv_mode=cv_mode)
             if retrieve_only:
                 reduced_cv = gam_variance_explained.maybe_load_saved_crossval(
-                    save_path=loo_path,
+                        save_path=loo_path,
                     load_if_exists=True,
                     verbose=False,
                 )
@@ -272,6 +290,7 @@ class OneFFGAMRunner:
                     n_folds=n_folds,
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
+                    cv_mode=cv_mode,
                 )
 
             contributions[category_name] = {
@@ -290,6 +309,7 @@ class OneFFGAMRunner:
 
         return full_cv, contributions
 
+
     def run_my_gam(
         self,
         unit_idx: int,
@@ -303,11 +323,12 @@ class OneFFGAMRunner:
         Run fit + CV for one unit. If load_if_exists=True and both fit and CV
         results exist on disk, returns them without calling prepare_unit.
         """
+        cv_mode = "matlab_interleaved"
         lam_cfg = lambda_config or DEFAULT_LAMBDA_CONFIG
         lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
         outdir = self._unit_outdir(unit_idx)
         fit_save_path = outdir / "fit_results" / f"{lam_suffix}.pkl"
-        cv_save_path = outdir / "cv_var_explained" / f"{lam_suffix}.pkl"
+        cv_save_path = self._full_model_cv_file(outdir, cv_mode=cv_mode)
 
         if load_if_exists and fit_save_path.exists() and cv_save_path.exists():
             loaded = one_ff_gam_fit.load_fit_results(str(fit_save_path))
@@ -329,7 +350,7 @@ class OneFFGAMRunner:
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
         outdir.mkdir(parents=True, exist_ok=True)
         (outdir / "fit_results").mkdir(exist_ok=True)
-        (outdir / "cv_var_explained").mkdir(exist_ok=True)
+        cv_save_path.parent.mkdir(parents=True, exist_ok=True)
         self.outdir = outdir
         self.lam_suffix = lam_suffix
 
@@ -351,6 +372,7 @@ class OneFFGAMRunner:
             save_path=cv_save_path,
             n_folds=n_folds,
             buffer_samples=buffer_samples,
+            cv_mode=cv_mode,
         )
 
         return {
@@ -358,6 +380,8 @@ class OneFFGAMRunner:
             "cv_result": cv_res,
             "outdir": outdir,
         }
+
+
 
     def run_category_variance_contributions(
         self,
@@ -369,6 +393,7 @@ class OneFFGAMRunner:
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        cv_mode: str = 'matlab_interleaved',
     ) -> Dict:
         """
         Run or retrieve leave-one-category-out variance contribution analysis.
@@ -386,7 +411,8 @@ class OneFFGAMRunner:
         # Fast path: load saved CV results directly without preparing design/state.
         outdir = self._unit_outdir(unit_idx)
         (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
-        full_path = self._full_model_cv_path(outdir)
+        full_path = self._full_model_cv_file(outdir, cv_mode=cv_mode)
+        full_path.parent.mkdir(parents=True, exist_ok=True)
 
         full_cv_loaded = None
         if retrieve_only or load_if_exists:
@@ -400,7 +426,7 @@ class OneFFGAMRunner:
             category_contrib_loaded = {}
             missing_category = None
             for category_name in category_names:
-                loo_path = self._category_cv_path(outdir, category_name)
+                loo_path = self._category_cv_file(outdir, category_name, cv_mode=cv_mode)
                 reduced_cv = gam_variance_explained.maybe_load_saved_crossval(
                     save_path=loo_path,
                     load_if_exists=True,
@@ -442,7 +468,7 @@ class OneFFGAMRunner:
                 }
 
             if retrieve_only:
-                missing_path = self._category_cv_path(outdir, missing_category)
+                missing_path = self._category_cv_file(outdir, missing_category, cv_mode=cv_mode)
                 raise FileNotFoundError(
                     f"No saved category CV result found for '{missing_category}' at: {missing_path}"
                 )
@@ -468,6 +494,7 @@ class OneFFGAMRunner:
             category_names=category_names,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
+            cv_mode=cv_mode,
         )
 
         contrib_df = pd.DataFrame.from_dict(category_contrib, orient="index")
@@ -529,7 +556,7 @@ class OneFFGAMRunner:
         self.outdir = outdir
         self.lam_suffix = lam_suffix
 
-        path = self._category_cv_path(outdir, category_name)
+        path = self._category_cv_file(outdir, category_name)
         cv_result = gam_variance_explained.maybe_load_saved_crossval(
             save_path=path,
             load_if_exists=True,
@@ -548,7 +575,7 @@ class OneFFGAMRunner:
         lambda_config: Optional[Dict[str, float]] = None,
         alpha: float = 0.05,
         n_folds: int = 10,
-        cv_mode: str = 'group_kfold',
+        cv_mode: str = 'matlab_interleaved',
         buffer_samples: int = 20,
         trial_ids=None,
         load_if_exists: bool = True,
@@ -567,7 +594,9 @@ class OneFFGAMRunner:
         lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
             lambda_config=lambda_for_path
         )
-        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
+        # include CV mode in filename so results are distinct per CV splitter
+        lam_suffix_cv = f"{lam_suffix}__{cv_mode}"
+        save_path = outdir / "backward_elimination" / f"{lam_suffix_cv}.pkl"
         if (load_if_exists or retrieve_only) and save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
             if loaded.get("completed", False):
@@ -583,7 +612,8 @@ class OneFFGAMRunner:
                 history = loaded.get("history", [])
                 history_csv = None
                 if history:
-                    history_csv = outdir / "history.csv"
+                    history_csv = outdir / "backward_elimination" / f"{lam_suffix_cv}_history.csv"
+                    history_csv.parent.mkdir(parents=True, exist_ok=True)
                     pd.DataFrame(history).to_csv(history_csv, index=False)
                 self.outdir = outdir
                 self.lam_suffix = lam_suffix
@@ -606,9 +636,11 @@ class OneFFGAMRunner:
         )
         self.outdir = outdir
         self.lam_suffix = lam_suffix
-        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
+        # include CV mode in filename so results are distinct per CV splitter
+        lam_suffix_cv = f"{lam_suffix}__{cv_mode}"
+        save_path = outdir / "backward_elimination" / f"{lam_suffix_cv}.pkl"
 
-        if trial_ids is None and cv_mode == 'group_kfold' and self.data_obj is not None:
+        if trial_ids is None and cv_mode == 'matlab_interleaved' and self.data_obj is not None:
             trial_ids = self.data_obj.get_cv_groups_for_design(self.design_df)
 
         kept, history = backward_elimination.backward_elimination_gam(
@@ -629,7 +661,8 @@ class OneFFGAMRunner:
 
         history_csv = None
         if history:
-            history_csv = outdir / "history.csv"
+            history_csv = outdir / "backward_elimination" / f"{lam_suffix_cv}_history.csv"
+            history_csv.parent.mkdir(parents=True, exist_ok=True)
             pd.DataFrame(history).to_csv(history_csv, index=False)
 
         return {

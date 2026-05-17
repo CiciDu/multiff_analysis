@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,12 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
     FS_DECODING_VAR_CATEGORIES, PN_DECODING_VAR_CATEGORIES,
     STOP_DECODING_VAR_CATEGORIES, VIS_DECODING_VAR_CATEGORIES)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_feature_selection.task_feat_keep_registry import (
+    FS_FEATS_KEEP as _FS_FEATS_KEEP,
+    PN_FEATS_KEEP as _PN_FEATS_KEEP,
+    STOPS_FEATS_KEEP as _STOPS_FEATS_KEEP,
+    VIS_FEATS_KEEP as _VIS_FEATS_KEEP,
+)
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import \
     encoding_design_utils
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import (
@@ -45,6 +51,17 @@ DEFAULT_STOP_CANONCORR_VARS = [
     "time_rel_to_event_start", "cluster_progress_c",
 ]
 DEFAULT_FS_CANONCORR_VARS = ["speed", "ang_speed", "accel"]
+
+
+def _subset_feats_to_keep(feats: pd.DataFrame, keep: Sequence[str]) -> pd.DataFrame:
+    """Restrict feats to columns named in keep (order preserved from keep)."""
+    cols = [c for c in keep if c in feats.columns]
+    if not cols:
+        raise ValueError(
+            "No overlap between feats_to_decode columns and keep list "
+            f"(n_feat_cols={feats.shape[1]}, n_keep={len(keep)})."
+        )
+    return feats[cols].copy()
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +99,8 @@ class StopTask(BaseDecodingTask):
 
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
+            self.feats_to_decode = _subset_feats_to_keep(
+                self.feats_to_decode, _STOPS_FEATS_KEEP)
             self.clean_var_categories()
             print("[StopTask] Using cached design matrices")
             return
@@ -113,6 +132,8 @@ class StopTask(BaseDecodingTask):
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(
             self.feats_to_decode
         )
+        self.feats_to_decode = _subset_feats_to_keep(
+            self.feats_to_decode, _STOPS_FEATS_KEEP)
 
         id_cols = {"new_segment", "new_bin", "new_seg_start_time", "new_seg_end_time", "new_seg_duration"}
         cluster_cols = [c for c in rebinned_spike_rates.columns if c not in id_cols]
@@ -177,6 +198,8 @@ class VisTask(BaseDecodingTask):
 
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
+            self.feats_to_decode = _subset_feats_to_keep(
+                self.feats_to_decode, _VIS_FEATS_KEEP)
             self.clean_var_categories()
             print("[VisTask] Using cached design matrices")
             return
@@ -219,6 +242,8 @@ class VisTask(BaseDecodingTask):
         feats_to_decode, _ = event_binning.selective_zscore(binned_feats)
         feats_to_decode = sm.add_constant(feats_to_decode, has_constant="add")
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(feats_to_decode)
+        self.feats_to_decode = _subset_feats_to_keep(
+            self.feats_to_decode, _VIS_FEATS_KEEP)
 
         id_cols = {"new_segment", "new_bin", "new_seg_start_time", "new_seg_end_time", "new_seg_duration"}
         cluster_cols = [c for c in rebinned_spike_rates.columns if c not in id_cols]
@@ -282,6 +307,8 @@ class PNTask(BaseDecodingTask):
 
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
+            self.feats_to_decode = _subset_feats_to_keep(
+                self.feats_to_decode, _PN_FEATS_KEEP)
             self.clean_var_categories()
             print("[PNTask] Using cached design matrices")
             return
@@ -328,6 +355,8 @@ class PNTask(BaseDecodingTask):
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(
             self.feats_to_decode
         )
+        self.feats_to_decode = _subset_feats_to_keep(
+            self.feats_to_decode, _PN_FEATS_KEEP)
 
         detrend_dict = {}
         if "t_center" in pn.rebinned_y_var.columns:
@@ -419,6 +448,8 @@ class FSTask(BaseDecodingTask):
 
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
+            self.feats_to_decode = _subset_feats_to_keep(
+                self.feats_to_decode, _FS_FEATS_KEEP)
             self.clean_var_categories()
             print("[FSTask] Using cached design matrices")
             return
@@ -439,6 +470,8 @@ class FSTask(BaseDecodingTask):
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(
             self.feats_to_decode
         )
+        self.feats_to_decode = _subset_feats_to_keep(
+            self.feats_to_decode, _FS_FEATS_KEEP)
 
         self._get_binned_spikes_fs()
 

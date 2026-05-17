@@ -131,6 +131,7 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                                                           merge_diff_in_curv_df_to_heading_info=True,
                                                           use_stored_data_only=False,
                                                           test_or_control_filter=None,
+                                                          slim_save=True,
                                                           **env_kwargs):
 
         save_data = False if use_stored_data_only else save_data
@@ -161,7 +162,9 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
         except Exception as e:
             if use_stored_data_only:
                 raise Exception(
-                    'Data missing. Since use_stored_data_only is True, will not be able to make heading info df.')
+                    'use_stored_data_only=True: per-session heading_info_df must already '
+                    'exist on disk; will not run rollouts or build new heading tables. '
+                    f'Original error: {e}') from e
             print(
                 f'Data missing. Will get agent data first. Error message: {e}')
             # Exclude planning-specific kwargs that the env/agent does not expect
@@ -181,7 +184,8 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                                                                       ref_point_value=ref_point_value, use_curv_to_ff_center=use_curv_to_ff_center,
                                                                       heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                       save_data=save_data,
-                                                                      merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+                                                                      merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info,
+                                                                      slim_save=slim_save)
                     heading_info_df = self.pf.heading_info_df.copy()
                     diff_in_curv_df = self.pf.diff_in_curv_df.copy()
                     test_or_ctrl = 'test' if test_or_control == 'test' else 'ctrl'

@@ -36,6 +36,7 @@ CV_MODE_CANDIDATES = (
     'blocked_time',
     'group_kfold',
     'kfold',
+    'matlab_interleaved',
 )
 
 
@@ -425,6 +426,31 @@ def _build_folds(
             folds.append((train_idx, test_idx))
 
         # print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
+        return folds
+
+    # -------- MATLAB-style INTERLEAVED SPLITS --------
+    # This replicates the splitting strategy used in the MATLAB
+    # neuroGAM/ FitModel.m implementation: data are divided into
+    # nfolds * nchunks pieces, then each fold's test indices are
+    # collected by interleaving pieces across the recording so that
+    # each fold samples from across the session.
+    if cv_splitter == 'matlab_interleaved':
+        nchunks = 5
+        nsections = n_splits * nchunks
+        edges = np.round(np.linspace(0, n, nsections + 1)).astype(int)
+        folds = []
+        for k in range(n_splits):
+            test_idx = []
+            for j in range(nchunks):
+                start = edges[j * n_splits + k]
+                end = edges[j * n_splits + k + 1]
+                if end > start:
+                    test_idx.extend(range(int(start), int(end)))
+            test_idx = np.array(test_idx, dtype=int)
+            train_idx = np.setdiff1d(idx, test_idx)
+            if len(train_idx) == 0 or len(test_idx) == 0:
+                continue
+            folds.append((train_idx, test_idx))
         return folds
 
     # -------- FORWARD-CHAINING (causal CV) --------
@@ -908,7 +934,14 @@ def consolidate_results_across_models(
     pkl_paths = list(out_dir.rglob('*.pkl'))
 
     if verbosity > 0:
-        print(f'Found {len(pkl_paths)} pkl files under {out_dir}: {pkl_paths}')
+        print(f'Found {len(pkl_paths)} pkl files under:\n  {out_dir}')
+
+        if len(pkl_paths) > 0:
+            print('PKL files:')
+            for path in pkl_paths:
+                print(f'  - {path.relative_to(out_dir)}')
+        else:
+            print('No pkl files found.')
 
     all_dfs = []
 

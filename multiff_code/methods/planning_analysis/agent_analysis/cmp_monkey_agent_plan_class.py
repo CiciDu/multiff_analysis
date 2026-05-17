@@ -15,7 +15,8 @@ class CompareMonkeyAgentPlan(variations_base_class._VariationsBase):
                  backend='matplotlib'):
         self.model_folder_name = model_folder_name
         self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
-            model_folder_name=self.model_folder_name, opt_arc_type=opt_arc_type)
+            model_folder_name=self.model_folder_name,
+            opt_arc_type=opt_arc_type)
         super().__init__(opt_arc_type=opt_arc_type, backend=backend)
         
         

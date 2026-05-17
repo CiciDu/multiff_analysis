@@ -4,7 +4,6 @@ from null_behaviors import curvature_utils, curv_of_traj_utils
 import math
 
 import os
-import torch
 import numpy as np
 import matplotlib
 from matplotlib import rc
@@ -418,6 +417,8 @@ def make_pred_ff_indices_dict(moit2, y_pred_all):
     pred_ff_indices_dict = {}
 
     if y_pred_all is None:
+        import torch
+
         nn_model = moit2.nn_model
         nn_model.eval()
         y_pred_all = nn_model(torch.tensor(

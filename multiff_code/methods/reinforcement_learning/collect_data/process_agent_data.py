@@ -804,7 +804,7 @@ def find_corresponding_info_of_agent(env, sac_model, info_of_monkey, start_time,
     )
 
     ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted,
-                                                                ff_caught_T_new, ff_life_sorted)
+                                                                ff_caught_T_new, ff_life_sorted, monkey_information)
 
     ff_dataframe = make_ff_dataframe.process_ff_dataframe(
         ff_dataframe,

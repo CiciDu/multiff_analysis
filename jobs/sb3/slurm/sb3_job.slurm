@@ -23,8 +23,9 @@ N_ENVS=1
 # Define hyperparameter lists
 # ---------------------
 declare -a LRS=(3e-4)
-declare -a NUM_OBS_FF_LIST=(1 2 3 4 5 6 7)
-declare -a MAX_IN_MEMORY_TIME_LIST=(2 3)
+# declare -a NUM_OBS_FF_LIST=(1 2 3 4 5 6 7)
+declare -a NUM_OBS_FF_LIST=(1)
+declare -a MAX_IN_MEMORY_TIME_LIST=(2 3 4)
 declare -a IDENTITY_SLOT_STRATEGY_LIST=(rank_keep_visible_only rank_keep_visible_and_memory drop_fill_visible_only drop_fill_visible_and_memory)
 declare -a BASE_SEEDS=(0 1 2 3)
 NUM_REPEATS=5

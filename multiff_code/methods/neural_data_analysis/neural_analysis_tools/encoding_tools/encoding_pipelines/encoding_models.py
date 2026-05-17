@@ -469,6 +469,8 @@ class PGAMModel(BaseEncodingModel):
             task.var_categories["coupling_vars"] = sorted(
                 g for g in hist_groups if str(g).startswith("cpl_")
             )
+        else:
+            task.var_categories["coupling_vars"] = []
 
         gam_groups = encoding_design_utils.build_gam_groups_from_meta(
             task.structured_meta_groups,
@@ -476,6 +478,7 @@ class PGAMModel(BaseEncodingModel):
             lam_g=self.lambda_config["lam_g"],
             lam_h=self.lambda_config["lam_h"],
             lam_p=self.lambda_config["lam_p"],
+            design_columns=design_df.columns,
         )
         encoding_design_utils._validate_design_columns(design_df, gam_groups)
 
@@ -904,12 +907,13 @@ class PGAMModel(BaseEncodingModel):
         backward_n_folds: int = 10,
         alpha: float = 0.05,
         load_if_exists: bool = True,
+        run_backward_elimination: bool = True,
         verbose: bool = True,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
         n_jobs: int = 1,
     ) -> None:
-        """Category contributions + backward elimination for one unit."""
+        """Category contributions + optional backward elimination for one unit."""
         if verbose:
             print(f"[PGAMModel] Full analysis for unit {unit_idx}")
         try:
@@ -920,15 +924,16 @@ class PGAMModel(BaseEncodingModel):
                 load_if_exists=load_if_exists,
                 cv_mode=cv_mode,
             )
-            self.run_backward_elimination(
-                task, unit_idx,
-                n_folds=backward_n_folds,
-                alpha=alpha,
-                load_if_exists=load_if_exists,
-                cv_mode=cv_mode,
-                buffer_samples=buffer_samples,
-                n_jobs=n_jobs,
-            )
+            if run_backward_elimination:
+                self.run_backward_elimination(
+                    task, unit_idx,
+                    n_folds=backward_n_folds,
+                    alpha=alpha,
+                    load_if_exists=load_if_exists,
+                    cv_mode=cv_mode,
+                    buffer_samples=buffer_samples,
+                    n_jobs=n_jobs,
+                )
         except Exception as e:
             if verbose:
                 print(f"  [WARN] unit {unit_idx}: {e}")
@@ -942,6 +947,7 @@ class PGAMModel(BaseEncodingModel):
         backward_n_folds: int = 10,
         alpha: float = 0.05,
         load_if_exists: bool = True,
+        run_backward_elimination: bool = True,
         verbose: bool = True,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
@@ -959,6 +965,7 @@ class PGAMModel(BaseEncodingModel):
                 backward_n_folds=backward_n_folds,
                 alpha=alpha,
                 load_if_exists=load_if_exists,
+                run_backward_elimination=run_backward_elimination,
                 verbose=verbose,
                 cv_mode=cv_mode,
                 buffer_samples=buffer_samples,

@@ -281,8 +281,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self._make_agent_for_curriculum_training()
         self.successful_training = False
         self._use_while_loop_for_curriculum_training()
-        self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
-                                         video_dir=self.best_model_postcurriculum_dir)
+        # self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
+        #                                  video_dir=self.best_model_postcurriculum_dir)
 
     def _make_init_env_for_curriculum_training(
         self,
@@ -683,11 +683,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             if save_data:
                 self.ff_dataframe.to_csv(self.ff_dataframe_path)
                 print("saved ff_dataframe at", self.ff_dataframe_path)
-
-        make_ff_dataframe.add_essential_columns_to_ff_dataframe(
-            self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, 10, 25)
-        self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
-                                                                   self.ff_caught_T_new, self.ff_life_sorted)
 
         return
 
@@ -1512,6 +1507,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.streamline_getting_data_from_agent(
             n_steps=9000, exists_ok=True, save_data=True)
         self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
-                                                                    self.ff_caught_T_new, self.ff_life_sorted)
+                                                                    self.ff_caught_T_new, self.ff_life_sorted, self.monkey_information)
         if find_patterns:
             self.find_patterns()

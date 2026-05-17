@@ -163,6 +163,8 @@ def add_agent_id_and_essential_agent_params_info_to_df(df, model_folder_name):
         df = rl_base_utils.add_essential_agent_params_info(
             df, params)
         df['id'] = agent_id
+    else:
+        print(f'[PROCESS] No df provided for agent: {model_folder_name}')
 
     return df, agent_id
 
@@ -193,6 +195,11 @@ def prepare_agent_monkey_comparison_df(
     both_perc_df : pd.DataFrame
     new_both_perc_df : pd.DataFrame
     """
+
+    if 'id' not in monkey_median_df.columns:
+        monkey_median_df['id'] = 'monkey'
+    if 'id' not in monkey_perc_df.columns:
+        monkey_perc_df['id'] = 'monkey'
 
     # combine median dfs
     both_median_df = pd.concat([agent_median_df, monkey_median_df], axis=0)

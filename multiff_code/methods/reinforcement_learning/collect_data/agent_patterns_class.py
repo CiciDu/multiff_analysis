@@ -116,7 +116,7 @@ class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features
                 save_data=save_data, retrieve_ff_flash_sorted=True)
             self.agent.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(
                 self.agent.ff_dataframe, self.agent.ff_real_position_sorted,
-                self.agent.ff_caught_T_new, self.agent.ff_life_sorted)
+                self.agent.ff_caught_T_new, self.agent.ff_life_sorted, self.agent.monkey_information)
             self.agent.make_df_related_to_patterns_and_features(exists_ok=exists_ok)
 
             self.agent.pattern_frequencies['data_name'] = data_name

@@ -157,7 +157,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
 
     if to_furnish_ff_dataframe:
         ff_dataframe = furnish_ff_dataframe(
-            ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted)
+            ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, monkey_information)
 
     return ff_dataframe
 
@@ -195,7 +195,7 @@ def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
     return ff_dataframe
 
 
-def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted):
+def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, monkey_information):
 
     ff_dataframe['abs_delta_ff_angle'], ff_dataframe['abs_delta_ff_angle_boundary'] = specific_utils.calculate_change_in_abs_ff_angle(current_ff_index=ff_dataframe['ff_index'].values, angles_to_ff=ff_dataframe['ff_angle'].values,
                                                                                                                                       angles_to_boundaries=ff_dataframe['ff_angle_boundary'].values, ff_real_position_sorted=ff_real_position_sorted, 

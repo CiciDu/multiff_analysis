@@ -217,6 +217,7 @@ def add_essential_agent_params_info(df, params):
     df = df.copy()
     df['num_obs_ff'] = params['num_obs_ff']
     df['max_in_memory_time'] = params['max_in_memory_time']
+    df['identity_slot_strategy'] = params['identity_slot_strategy']
     df['whether_with_cost'] = 'with_cost' if (
         params['dv_cost_factor'] > 0) else 'no_cost'
     df['dv_cost_factor'] = params['dv_cost_factor']

@@ -1,0 +1,3 @@
+keep = ['time_rel_to_event_start', 'accel', 'v', 'cluster_progress_c', 'eye_hor', 'bin_t_from_cluster_start_s_z', 'log1p_num_ff_in_memory', 'log1p_num_ff_visible', 'w', 'num_ff_visible', 'num_ff_in_memory']
+
+not_keep = ['ang_accel', 'log_n_events_in_cluster_z', 'phi', 'gap_till_next_event_in_cluster_z', 'gap_since_prev_event_in_cluster_z', 'eye_world_speed', 'eye_ver', 'time_since_prev_event', 'cluster_duration_s_z', 'time', 'd']

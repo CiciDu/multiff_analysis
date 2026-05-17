@@ -25,7 +25,7 @@ def run_encoding_main(
     *,
     model_class = encoding_models.PGAMModel,
     #model_class = encoding_models.RNNModel,
-    cv_mode: str = "blocked_time_buffered", #"blocked_time_buffered",
+    #cv_mode: str = "blocked_time_buffered", #"blocked_time_buffered",
 ) -> Dict[str, Any]:
     """
     Common main logic for encoding scripts.
@@ -62,65 +62,72 @@ def run_encoding_main(
 
     all_session_results: Dict[str, Any] = {}
 
-    for raw_data_folder_path in session_paths:
-        print("=" * 80)
-        print(f"Processing: {raw_data_folder_path}")
-        print("=" * 80)
+    for cv_mode in ['blocked_time_buffered', 'group_kfold', 'matlab_interleaved']:
 
-        try:
-            task = task_class(
-                raw_data_folder_path=raw_data_folder_path,
-                bin_width=args.bin_width,
-            )
+        for raw_data_folder_path in session_paths:
+            print("=" * 80)
+            print(f"Processing: {raw_data_folder_path}")
+            print("=" * 80)
 
-            for use_neural_coupling in [True, False]:
-                model = model_class(cv_mode=cv_mode)
-                runner = encoding_runner.EncodingRunner(
-                    task, model, use_neural_coupling=use_neural_coupling
+            try:
+                task = task_class(
+                    raw_data_folder_path=raw_data_folder_path,
+                    bin_width=args.bin_width,
                 )
 
-                runner.collect_data(exists_ok=load_if_exists)
+                for use_neural_coupling in [False, True]:
 
-                all_neuron_r2 = runner.crossval_all_neurons(
-                    n_folds=args.n_splits,
-                    load_if_exists=load_if_exists,
-                    buffer_samples=20,
-                    verbose=True,
-                    plot_cdf=False,
-                    log_x=False,
-                )
+                    run_backward_elimination = True if not use_neural_coupling else False
 
-                all_session_results[raw_data_folder_path] = all_neuron_r2
+                    print(f"Running with use_neural_coupling={use_neural_coupling}")
+                    model = model_class(cv_mode=cv_mode)
+                    runner = encoding_runner.EncodingRunner(
+                        task, model, use_neural_coupling=use_neural_coupling
+                    )
 
-                if hasattr(runner.model, "run_full_analysis_all_neurons"):
-                    runner.run_full_analysis_all_neurons(
+                    runner.collect_data(exists_ok=load_if_exists)
+
+                    all_neuron_r2 = runner.crossval_all_neurons(
                         n_folds=args.n_splits,
-                        buffer_samples=20,
-                        backward_n_folds=10,
-                        alpha=0.05,
                         load_if_exists=load_if_exists,
+                        buffer_samples=20,
                         verbose=True,
-                    )
-                else:
-                    print(
-                        f"[INFO] Skipping full-analysis step for "
-                        f"{type(runner.model).__name__} "
-                        "(method not implemented)."
+                        plot_cdf=False,
+                        log_x=False,
                     )
 
+                    all_session_results[raw_data_folder_path] = all_neuron_r2
 
-                # # anova / lm
-                # cat_vars = runner.find_categorical_vars()
-                # anova = runner.run_anova_all_neurons(alpha=0.05)
-                # lm = runner.run_lm_all_neurons(include_all_feats=True, alpha=0.05)
+                    if hasattr(runner.model, "run_full_analysis_all_neurons"):
+                        runner.run_full_analysis_all_neurons(
+                            n_folds=args.n_splits,
+                            buffer_samples=20,
+                            backward_n_folds=10,
+                            alpha=0.05,
+                            load_if_exists=load_if_exists,
+                            verbose=True,
+                            run_backward_elimination=run_backward_elimination,
+                        )
+                    else:
+                        print(
+                            f"[INFO] Skipping full-analysis step for "
+                            f"{type(runner.model).__name__} "
+                            "(method not implemented)."
+                        )
+
+
+                    # # anova / lm
+                    # cat_vars = runner.find_categorical_vars()
+                    # anova = runner.run_anova_all_neurons(alpha=0.05)
+                    # lm = runner.run_lm_all_neurons(include_all_feats=True, alpha=0.05)
 
 
 
-        except Exception as e:  # noqa: BLE001
-            print(f"[ERROR] Failed for {raw_data_folder_path}: {e}")
-            import traceback
+            except Exception as e:  # noqa: BLE001
+                print(f"[ERROR] Failed for {raw_data_folder_path}: {e}")
+                import traceback
 
-            traceback.print_exc()
+                traceback.print_exc()
 
     return all_session_results
 

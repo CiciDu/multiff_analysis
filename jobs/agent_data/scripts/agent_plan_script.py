@@ -20,8 +20,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
-from planning_analysis.agent_analysis import (
-    agent_plan_factors_x_agents_class, agent_plan_factors_x_sess_class)
+from planning_analysis.agent_analysis import agent_plan_factors_x_sess_class
 
 
 def main():
@@ -35,6 +34,16 @@ def main():
                         help='Number of datasets to collect')
     parser.add_argument('--num-steps-per-dataset', type=int, default=9000,
                         help='Number of steps per dataset')
+    parser.add_argument('--use-stored-data-only', action='store_true',
+                        help='Offline mode: retrieve-only heading_info_df per data_*; no new rollouts')
+    parser.add_argument(
+        '--rebuild-combined-heading-from-datasets',
+        action='store_true',
+        help=(
+            'Do not load the saved combd_heading_df_x_sessions aggregate; '
+            'rebuild it by iterating every data_* (and skip loading cached pooled_perc from disk).'
+        ),
+    )
     args = parser.parse_args()
 
     print(f'[SCRIPT] Agent path: {args.agent_path}')
@@ -45,7 +54,8 @@ def main():
         print(f'[SCRIPT] Processing agent directly...')
         
         pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
-            model_folder_name=args.agent_path)
+            model_folder_name=args.agent_path,
+        )
         
         # Determine save directory
         if args.save_dir:
@@ -63,10 +73,11 @@ def main():
         pfas.process_and_save(
             save_dir=save_dir,
             intermediate_products_exist_ok=True,
+            combined_heading_data_exists_ok=False,
             agent_data_exists_ok=True,
             num_steps_per_dataset=args.num_steps_per_dataset,
             num_datasets_to_collect=args.num_datasets_to_collect,
-            use_stored_data_only=False
+            use_stored_data_only=args.use_stored_data_only,
         )
 
         # Force regeneration of ff_dataframe for this specific agent/data split(s)

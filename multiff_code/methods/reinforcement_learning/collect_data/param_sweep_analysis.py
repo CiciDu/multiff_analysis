@@ -185,6 +185,10 @@ def collect_plan_results_df(
     use_stored_data_only=False,
     high_level_only=False,
     verbose=False,
+    intermediate_products_exist_ok=True,
+    agent_data_exists_ok=True,
+    save_combined_data=True,
+    ff_num_min=2,
 ):
     '''
     Collect pooled plan factor results across agents.
@@ -206,12 +210,21 @@ def collect_plan_results_df(
     overall_df_exists_ok : bool
         Passed to pfaa method.
     use_stored_data_only : bool
-        Passed to pfaa method.
+        Passed to pfaa method. When True, agent pipeline uses retrieve-only
+        per-``data_*`` ``heading_info_df`` (no new heading tables from rollouts).
     high_level_only : bool
         Passed to pfaa method.
     verbose : bool
         If False (default), suppress all output from the aggregation and print
         only a start/done status line. If True, print all output as usual.
+    save_combined_data : bool
+        If False (default), do not write concatenated heading CSVs across data_*.
+        Agent pipelines never write pooled ``cur_and_nxt/data_comparison/`` caches.
+    ff_num_min : int, optional
+        Only agent folders whose name matches ``ff{N}_mem...`` with ``N >= ff_num_min``
+        are processed. Default ``2`` excludes single-firefly runs (``ff1_*``), which
+        matches the original ``extract_ff_num(folder)[0] > 1`` filter. Use ``1`` to
+        include all trained ff counts (e.g. when you only have ``ff1_*`` agents).
 
     Returns
     -------
@@ -242,14 +255,16 @@ def collect_plan_results_df(
 
     with _ctx:
         pfaa = agent_plan_factors_x_agents_class.PlanFactorsAcrossAgents(
-            overall_folder_name=overall_folder_name
+            overall_folder_name=overall_folder_name,
         )
 
     # ---------- Filter agents ----------
+    # Historically only multi-ff agents were included (ff_num > 1). Single-ff (ff1_*)
+    # still have processed_data but were skipped here, yielding "No agent data found".
     filtered_agent_folders = [
         folder
         for folder in pfaa.agent_folders
-        if compare_monkey_and_agent_utils.extract_ff_num(folder)[0] > 1
+        if compare_monkey_and_agent_utils.extract_ff_num(folder)[0] >= ff_num_min
     ]
 
     sorted_agent_folders = sorted(
@@ -266,20 +281,53 @@ def collect_plan_results_df(
     n_agents = len(sorted_agent_folders)
     print(f'Processing {n_agents} agents...', end='', flush=True)
 
-    _ctx2 = contextlib.nullcontext() if verbose else contextlib.ExitStack()
-    if not verbose:
-        _ctx2.enter_context(contextlib.redirect_stdout(io.StringIO()))
-        _ctx2.enter_context(contextlib.redirect_stderr(io.StringIO()))
+    # Process agents one-by-one so we can show percentage progress.
+    pfaa.all_ref_pooled_median_x_agents = pd.DataFrame()
+    pfaa.pooled_perc_x_agents = pd.DataFrame()
 
-    with _ctx2:
-        pfaa.make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(
-            exists_ok=False,
-            num_datasets_to_collect=num_datasets_to_collect,
-            intermediate_products_exist_ok=True,
-            agent_data_exists_ok=True,
-            use_stored_data_only=use_stored_data_only,
-            high_level_only=high_level_only,
-        )
+    n_agents = len(pfaa.agent_folders)
+    for idx, folder in enumerate(pfaa.agent_folders):
+        percent = (idx + 1) / max(1, n_agents) * 100
+        print(f'\rProcessing {n_agents} agents... {idx + 1}/{n_agents} ({percent:.1f}%)', end='', flush=True)
+
+        _ctx2 = contextlib.nullcontext() if verbose else contextlib.ExitStack()
+        if not verbose:
+            _ctx2.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            _ctx2.enter_context(contextlib.redirect_stderr(io.StringIO()))
+
+        with _ctx2:
+            pfaa.process_single_agent_and_save(
+                folder=folder,
+                intermediate_products_exist_ok=intermediate_products_exist_ok,
+                agent_data_exists_ok=agent_data_exists_ok,
+                num_datasets_to_collect=num_datasets_to_collect,
+                use_stored_data_only=use_stored_data_only,
+                high_level_only=high_level_only,
+                save_combined_data=save_combined_data,
+                verbose=verbose,
+            )
+
+        # collect results from the last processed agent (no concat with an empty acc: pandas FutureWarning)
+        if hasattr(pfaa, 'pfas') and getattr(pfaa.pfas, 'all_ref_pooled_median_info', None) is not None:
+            _med = pfaa.pfas.all_ref_pooled_median_info
+            if not _med.empty:
+                if pfaa.all_ref_pooled_median_x_agents.empty:
+                    pfaa.all_ref_pooled_median_x_agents = _med
+                else:
+                    pfaa.all_ref_pooled_median_x_agents = pd.concat(
+                        [pfaa.all_ref_pooled_median_x_agents, _med],
+                        axis=0,
+                    )
+        if hasattr(pfaa, 'pfas') and getattr(pfaa.pfas, 'pooled_perc_info', None) is not None:
+            _perc = pfaa.pfas.pooled_perc_info
+            if not _perc.empty:
+                if pfaa.pooled_perc_x_agents.empty:
+                    pfaa.pooled_perc_x_agents = _perc
+                else:
+                    pfaa.pooled_perc_x_agents = pd.concat(
+                        [pfaa.pooled_perc_x_agents, _perc],
+                        axis=0,
+                    )
 
     print(' done.')
 
@@ -287,7 +335,19 @@ def collect_plan_results_df(
     agent_perc_df = pfaa.pooled_perc_x_agents.copy()
 
     if len(agent_median_df) == 0:
-        raise ValueError('No agent data found')
+        if n_agents == 0:
+            raise ValueError(
+                f'No agent folders to process after ff_num_min={ff_num_min} filter '
+                f'(under {overall_folder_name!r}). '
+                f'Single-firefly agents (ff1_*) are excluded when ff_num_min=2; '
+                f'pass ff_num_min=1 to include them. '
+                f'Folders must match the name pattern ff<N>_mem<M>_... .'
+            )
+        raise ValueError(
+            'No agent data in aggregated median frame after processing '
+            f'{n_agents} folder(s). Run with verbose=True to see errors, or check '
+            'that rollouts / planning intermediates exist for num_datasets_to_collect.'
+        )
 
     # ---------- Save ----------
     if save_df:

@@ -10,6 +10,90 @@ from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mp
     LINESTYLE_MAP
 
 
+def _grid_idx(vals, v):
+    """Return the index in `vals` that matches `v` (exact for strings, nearest for numerics)."""
+    exact = np.where(vals == v)[0]
+    if len(exact):
+        return int(exact[0])
+    try:
+        return int(np.argmin(np.abs(vals.astype(float) - float(v))))
+    except (ValueError, TypeError):
+        return None
+
+
+def _fmt_sweep_val(v):
+    """Format a sweep parameter value compactly for circle annotation."""
+    if pd.isna(v):
+        return '?'
+    try:
+        fv = float(v)
+        return str(int(fv)) if fv == int(fv) else f'{fv:.1f}'
+    except (ValueError, TypeError):
+        # string: initials of each underscore-separated word
+        return ''.join(w[0] for w in str(v).split('_'))
+
+
+def _overlay_top_agents(axes, x_vals, y_vals, key_x, key_y,
+                         top_agents_df, marker_size_range, sweep_keys, fig=None):
+    """
+    Overlay circles on heatmap axes for the top-ranked agents.
+
+    Per cell (key_x, key_y pair): shows only the best-ranked agent's circle
+    (largest = rank 1). Annotates every circle with the value(s) of the
+    unswept sweep key(s) for the best agent at that cell.
+    Adds a size legend (rank 1 = largest) to the first axis.
+    """
+    s_max, s_min = marker_size_range
+    n_agents = len(top_agents_df)
+    unswept_keys = [k for k in sweep_keys if k not in (key_x, key_y)]
+
+    def _size(rank):
+        return s_max + (s_min - s_max) * (rank - 1) / max(n_agents - 1, 1)
+
+    # Best-ranked agent per cell (sort so first row = best rank after groupby)
+    best_per_cell = (
+        top_agents_df.sort_values('rank')
+        .groupby([key_x, key_y], dropna=False)
+        .first()
+        .reset_index()
+    )
+
+    for _, cell in best_per_cell.iterrows():
+        xi = _grid_idx(x_vals, cell[key_x])
+        yi = _grid_idx(y_vals, cell[key_y])
+        if xi is None or yi is None:
+            continue
+        rank = cell['rank']
+        size = _size(rank)
+        label = '/'.join(_fmt_sweep_val(cell[k]) for k in unswept_keys) if unswept_keys else str(int(rank))
+        for ax in axes:
+            ax.scatter(xi, yi, s=size, marker='o',
+                       facecolors='none', edgecolors='white', linewidths=1.5,
+                       zorder=5)
+            ax.text(xi, yi, label, color='white',
+                    ha='center', va='center', fontsize=7,
+                    fontweight='bold', zorder=7)
+
+    # Size legend: show rank 1, middle, and last
+    legend_ranks = sorted({1, (n_agents + 1) // 2, n_agents})
+    handles = [
+        plt.scatter([], [], s=_size(r), marker='o',
+                    facecolors='none', edgecolors='white', linewidths=1.5,
+                    label=f'rank {r}')
+        for r in legend_ranks
+    ]
+    legend_ax = fig if fig is not None else axes[0]
+    legend_kwargs = dict(
+        handles=handles, title='circle size\n(MSE rank)',
+        framealpha=0.5, labelcolor='white', title_fontsize=7,
+        fontsize=7, facecolor='#333333',
+    )
+    if fig is not None:
+        fig.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), **legend_kwargs)
+    else:
+        axes[0].legend(loc='lower left', **legend_kwargs)
+
+
 def plot_pairwise_interactions(
     df,
     sweep_keys,
@@ -21,6 +105,9 @@ def plot_pairwise_interactions(
     figsize=(6, 5),
     cmap='viridis',
     title=None,
+    test_or_control=None,
+    top_agents_df=None,
+    top_agents_marker_size_range=(600, 80),
 ):
     """
     Plot pairwise heatmaps for selected metrics.
@@ -38,6 +125,9 @@ def plot_pairwise_interactions(
 
     import matplotlib.pyplot as plt
     import numpy as np
+
+    if test_or_control is not None:
+        df = df[df['test_or_control'] == test_or_control].copy()
 
     valid_keys = [k for k in sweep_keys if k in df.columns]
 
@@ -110,8 +200,20 @@ def plot_pairwise_interactions(
 
             ax.set_xticks(np.arange(len(x_vals)))
             ax.set_yticks(np.arange(len(y_vals)))
-            ax.set_xticklabels(np.round(x_vals, 4), rotation=45)
-            ax.set_yticklabels(np.round(y_vals, 4))
+
+            # format tick labels
+            if np.issubdtype(np.array(x_vals).dtype, np.number):
+                x_labels = np.round(x_vals, 4)
+            else:
+                x_labels = x_vals
+
+            if np.issubdtype(np.array(y_vals).dtype, np.number):
+                y_labels = np.round(y_vals, 4)
+            else:
+                y_labels = y_vals
+
+            ax.set_xticklabels(x_labels, rotation=45, ha='right')
+            ax.set_yticklabels(y_labels)
 
             ax.set_xlabel(key_x)
             ax.set_ylabel(key_y)
@@ -120,15 +222,27 @@ def plot_pairwise_interactions(
             cbar = fig.colorbar(im, ax=ax)
             cbar.set_label(name)
 
-        suptitle = (
-            title
-            if title is not None
-            else f'{key_x} × {key_y}  |  {target_col}'
-        )
+
+        # Overlay top-agent circles if provided
+        if top_agents_df is not None and key_x in top_agents_df.columns and key_y in top_agents_df.columns:
+            _overlay_top_agents(axes, x_vals, y_vals, key_x, key_y,
+                                top_agents_df, top_agents_marker_size_range,
+                                sweep_keys, fig=fig)
+
+        if title is not None:
+            suptitle = title
+        elif test_or_control is not None:
+            suptitle = f'{test_or_control.capitalize()}: {key_x} × {key_y}  |  {target_col}'
+        else:
+            suptitle = f'{key_x} × {key_y}  |  {target_col}'
+
         fig.suptitle(suptitle, y=1.02)
 
         #plt.tight_layout()
         plt.show()
+
+
+
 
 def build_fixed_values_for_obs_sweep(
     sweep_key,

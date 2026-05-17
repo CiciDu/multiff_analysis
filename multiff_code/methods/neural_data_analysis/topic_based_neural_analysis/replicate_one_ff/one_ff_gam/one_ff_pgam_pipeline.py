@@ -243,7 +243,19 @@ class OneFFPGAMRunner:
         return outdir / "cv_var_explained" / "full_model.pkl"
 
     @staticmethod
+    def _full_model_cv_file(outdir: Path, cv_mode: Optional[str] = None) -> Path:
+        if cv_mode:
+            return outdir / "cv_var_explained" / cv_mode / "full_model.pkl"
+        return outdir / "cv_var_explained" / "full_model.pkl"
+
+    @staticmethod
     def _category_cv_path(outdir: Path, category_name: str) -> Path:
+        return outdir / "cv_var_explained" / f"leave_out_{category_name}.pkl"
+
+    @staticmethod
+    def _category_cv_file(outdir: Path, category_name: str, cv_mode: Optional[str] = None) -> Path:
+        if cv_mode:
+            return outdir / "cv_var_explained" / cv_mode / f"leave_out_{category_name}.pkl"
         return outdir / "cv_var_explained" / f"leave_out_{category_name}.pkl"
 
     @staticmethod
@@ -325,7 +337,8 @@ class OneFFPGAMRunner:
         # Fast path: load saved category-contribution CV results directly
         # without preparing per-unit design/smooth handler state.
         outdir = self._category_outdir(unit_idx)
-        full_path = self._full_model_cv_path(outdir)
+        full_path = self._full_model_cv_file(outdir, cv_mode=cv_mode)
+        full_path.parent.mkdir(parents=True, exist_ok=True)
 
         full_cv_payload = None
         if retrieve_only or load_if_exists:
@@ -336,7 +349,7 @@ class OneFFPGAMRunner:
             contributions_loaded = {}
             missing_category = None
             for category_name in category_names:
-                loo_path = self._category_cv_path(outdir, category_name)
+                loo_path = self._category_cv_file(outdir, category_name, cv_mode=cv_mode)
                 loo_payload = self._load_pickle(loo_path)
                 if loo_payload is None:
                     missing_category = category_name
@@ -405,7 +418,7 @@ class OneFFPGAMRunner:
             category_vars = self.var_categories[category_name]
             drop_smooths = self._resolve_drop_smooths(category_vars, available_smooths)
             keep_smooths = [s for s in available_smooths if s not in set(drop_smooths)]
-            loo_path = self._category_cv_path(outdir, category_name)
+            loo_path = self._category_cv_file(outdir, category_name, cv_mode=cv_mode)
 
             loo_payload = None
             if load_if_exists or retrieve_only:
@@ -471,7 +484,7 @@ class OneFFPGAMRunner:
                 f"Available: {list(self.var_categories.keys())}"
             )
         outdir = self._category_outdir(unit_idx)
-        path = self._category_cv_path(outdir, category_name)
+        path = self._category_cv_file(outdir, category_name)
         payload = self._load_pickle(path)
         if payload is None:
             raise FileNotFoundError(

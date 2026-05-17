@@ -32,11 +32,14 @@ class PlanFactorsAcrossAgents():
     def process_single_agent_and_save(self,
                                     folder,
                                     intermediate_products_exist_ok=True,
+                                    combined_heading_data_exists_ok=True,
                                     agent_data_exists_ok=True,
                                     num_steps_per_dataset=9000,
                                     num_datasets_to_collect=2,
                                     use_stored_data_only=False,
-                                    high_level_only=False):
+                                    high_level_only=False,
+                                    save_combined_data=True,
+                                    verbose=False):
         """
         Process a single agent and save results.
         
@@ -48,6 +51,8 @@ class PlanFactorsAcrossAgents():
             Path to agent folder
         intermediate_products_exist_ok : bool, optional
             Whether to reuse existing intermediate products (default: True)
+        combined_heading_data_exists_ok : bool, optional
+            Forwarded to ``process_and_save`` (default: True).
         agent_data_exists_ok : bool, optional
             Whether to reuse existing agent data (default: True)
         num_steps_per_dataset : int, optional
@@ -56,6 +61,12 @@ class PlanFactorsAcrossAgents():
             Number of datasets to collect (default: 2)
         use_stored_data_only : bool, optional
             If True, only use stored data (default: False)
+        save_combined_data : bool, optional
+            If False (default), skip writing concatenated heading CSVs across data_*.
+            Agent runs never persist pooled ``cur_and_nxt/data_comparison/`` caches;
+            only monkeys use that layout via ``PlanAcrossSessions``.
+        verbose : bool, optional
+            Passed to ``process_and_save``.
         """
 
         # Determine save directory based on overall folder structure
@@ -71,11 +82,14 @@ class PlanFactorsAcrossAgents():
         self.pfas.process_and_save(
             save_dir=save_dir,
             intermediate_products_exist_ok=intermediate_products_exist_ok,
+            combined_heading_data_exists_ok=combined_heading_data_exists_ok,
             agent_data_exists_ok=agent_data_exists_ok,
             num_steps_per_dataset=num_steps_per_dataset,
             num_datasets_to_collect=num_datasets_to_collect,
             use_stored_data_only=use_stored_data_only,
-            high_level_only=high_level_only
+            high_level_only=high_level_only,
+            save_combined_data=save_combined_data,
+            verbose=verbose,
         )
 
 
